@@ -1,0 +1,113 @@
+@import 'tailwindcss';
+
+/* motion-core:tokens:start */
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+	--base-hue: 265;
+
+	--radius-base: 0.275rem;
+
+	--background-inset: oklch(0.9764 0.0013 var(--base-hue));
+	--background: oklch(1 0 0);
+	--background-muted: oklch(0.956 0.002 var(--base-hue));
+	--fixed-light: oklch(1 0 0);
+	--fixed-dark: oklch(0.183 0.006 var(--base-hue));
+	--foreground: oklch(0.1881 0.006 var(--base-hue));
+	--foreground-muted: oklch(0.5493 0.0081 var(--base-hue));
+	--accent: oklch(0.6996 0.201959 44.4414);
+	--accent-secondary: oklch(0.5096 0.151959 44.4414);
+	--border: oklch(0.4224 0.0013 var(--base-hue) / 0.1);
+
+	--shadow-xs: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06);
+	--shadow-sm: 0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06);
+	--shadow-md:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06);
+	--shadow-lg:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06);
+	--shadow-xl:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06),
+		0px 24px 24px -12px rgba(0, 0, 0, 0.06);
+	--shadow-2xl:
+		0px 1px 1px -0.5px rgba(0, 0, 0, 0.06), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.06),
+		0px 6px 6px -3px rgba(0, 0, 0, 0.06), 0px 12px 12px -6px rgba(0, 0, 0, 0.06),
+		0px 24px 24px -12px rgba(0, 0, 0, 0.06), 0px 48px 48px -24px rgba(0, 0, 0, 0.06);
+}
+
+.dark {
+	--background-inset: oklch(0.2099 0.0039 var(--base-hue));
+	--background: oklch(0.2574 0.0056 var(--base-hue));
+	--background-muted: oklch(0.283 0.0091 var(--base-hue));
+	--foreground: oklch(0.9674 0.0013 var(--base-hue));
+	--foreground-muted: oklch(0.669 0.0107 var(--base-hue));
+	--accent: oklch(0.6996 0.181959 44.4414);
+	--accent-secondary: oklch(0.5096 0.131959 44.4414);
+	--border: oklch(0.999 0.013 var(--base-hue) / 0.05);
+}
+
+@theme {
+	--color-fixed-light: var(--fixed-light);
+	--color-fixed-dark: var(--fixed-dark);
+	--color-background-inset: var(--background-inset);
+	--color-background: var(--background);
+	--color-background-muted: var(--background-muted);
+	--color-foreground: var(--foreground);
+	--color-foreground-muted: var(--foreground-muted);
+	--color-accent: var(--accent);
+	--color-accent-secondary: var(--accent-secondary);
+	--color-border: var(--border);
+
+	--radius-xs: calc(var(--radius-base) * 1);
+	--radius-sm: calc(var(--radius-base) * 2);
+	--radius-md: calc(var(--radius-base) * 3);
+	--radius-lg: calc(var(--radius-base) * 4);
+	--radius-xl: calc(var(--radius-base) * 6);
+	--radius-2xl: calc(var(--radius-base) * 8);
+	--radius-3xl: calc(var(--radius-base) * 12);
+	--radius-4xl: calc(var(--radius-base) * 16);
+	--radius-full: 9999px;
+
+	--shadow-xs: var(--shadow-xs);
+	--shadow-sm: var(--shadow-sm);
+	--shadow-md: var(--shadow-md);
+	--shadow-lg: var(--shadow-lg);
+	--shadow-xl: var(--shadow-xl);
+	--shadow-2xl: var(--shadow-2xl);
+}
+/* motion-core:tokens:end */
+
+.no-scrollbar {
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
+/* transitions-dev: avatar-group-hover, adapted to scale-only (no lift) */
+:root {
+	--avatar-dur: 320ms;
+	--avatar-scale: 1.05;
+	--avatar-press-scale: 0.94;
+	--avatar-ease-in: cubic-bezier(0.22, 1, 0.36, 1);
+	--avatar-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+}
+
+.t-avatar {
+	/* Center-anchored so scale grows/shrinks in place instead of shifting position. */
+	transform-origin: center;
+	transform: scale(var(--scale-active, 1));
+	transition: transform var(--avatar-dur) var(--avatar-ease-in);
+	will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.t-avatar {
+		transition: none !important;
+		transform: none !important;
+	}
+}

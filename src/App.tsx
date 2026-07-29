@@ -4,25 +4,17 @@ import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './compo
 import { cn } from './lib/cn';
 
 const defaultScale = 1.5;
-const focusScale = 1.8;
+const focusScale = 3;
 
-// A point at fixed sphere-space size projects to screen-space size
-// proportional to `scale` (that's what "zoom" means here), and the
-// lattice's nearest-neighbor spacing shrinks as 1/scale for the same
-// reason once pointCount is scaled to compensate. So to hold both the
-// on-screen dot size AND the dot-to-gap ratio constant across zoom
-// levels: pointCount grows with scale² (density is an area effect),
-// while pointSize/markerSize shrink linearly with 1/scale.
-// The lattice shader's index decoder was extended to a 23-bit unroll
-// (GlobeScene.tsx), so pointCount is no longer limited to 32767 —
-// but its `k` bucket estimate (also in GlobeScene.tsx) is only an
-// approximation, and pushing pointCount past ~150-200k makes that
-// approximation visibly break down as moiré rings/voids (worst near
-// the poles). Capped below that threshold: density still grows
-// noticeably with zoom, it just plateaus before the artifact appears.
-const basePointCount = 29000;
-const basePointSize = 0.087;
-const maxPointCount = 150_000;
+// Point count is held fixed across zoom levels, so the lattice's sphere-space
+// spacing is fixed too — but a point at fixed sphere-space size projects to
+// screen-space size proportional to `scale`, so on-screen spacing between
+// dots grows as you zoom in. pointSize is left unscaled (in sphere-space) so
+// it grows on-screen at that same rate, keeping the dot-to-gap ratio (and so
+// the perceived density) constant across zoom levels. markerSize instead
+// shrinks with 1/scale, holding marker pins at a constant on-screen size.
+const basePointCount = 35000;
+const basePointSize = 0.07;
 const baseMarkerSize = 0.06;
 
 const locations: { label: string; location: [number, number] }[] = [
@@ -46,14 +38,10 @@ function isFocused(focusOn: [number, number] | null, location: [number, number])
 
 export default function App() {
 	const [scale, setScale] = useState(defaultScale);
-	const [axialTilt, setAxialTilt] = useState(-23);
 	const [focusOn, setFocusOn] = useState<[number, number] | null>(null);
 
-	const pointCount = Math.min(
-		maxPointCount,
-		Math.round(basePointCount * (scale / defaultScale) ** 2)
-	);
-	const pointSize = basePointSize * (defaultScale / scale);
+	const pointCount = basePointCount;
+	const pointSize = basePointSize;
 	const markerSize = baseMarkerSize * (defaultScale / scale);
 
 	const scaleAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
@@ -61,7 +49,7 @@ export default function App() {
 	function animateScaleTo(target: number) {
 		scaleAnimationRef.current?.stop();
 		scaleAnimationRef.current = animate(scale, target, {
-			duration: 1.5,
+			duration: 0.5,
 			ease: 'easeInOut',
 			onUpdate: (latest) => setScale(latest)
 		});
@@ -70,7 +58,7 @@ export default function App() {
 	const markers: GlobeMarker[] = locations.map(({ label, location }) => ({
 		location,
 		label,
-		color: '#111113',
+		color: '#041c2c',
 		size: markerSize
 	}));
 
@@ -91,7 +79,7 @@ export default function App() {
 						: 'border-black/10 bg-white text-black'
 				)}
 			>
-				<span className="h-1.5 w-1.5 rounded-full bg-[#44d62c]" />
+				<span className="size-[10px] shrink-0 rounded-full bg-[#44d62c]" />
 				{marker.label}
 			</div>
 		);
@@ -105,7 +93,7 @@ export default function App() {
 					scale={scale}
 					offsetX={1 / 6}
 					rotation={5}
-					axialTilt={axialTilt}
+					axialTilt={-23}
 					pointCount={pointCount}
 					pointSize={pointSize}
 					landPointColor="#44d62c"
@@ -167,22 +155,6 @@ export default function App() {
 					</div>
 				</div>
 			</main>
-
-			<div className="flex w-72 flex-col gap-2 rounded-xl border border-black/10 bg-black/5 px-4 py-3 backdrop-blur-md">
-				<div className="flex items-center justify-between text-xs text-black/70">
-					<span>Axis tilt</span>
-					<span className="text-black tabular-nums">{axialTilt.toFixed(0)}°</span>
-				</div>
-				<input
-					type="range"
-					min="-90"
-					max="90"
-					step="1"
-					value={axialTilt}
-					onChange={(event) => setAxialTilt(Number(event.target.value))}
-					className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-black/15 accent-[#44d62c]"
-				/>
-			</div>
 		</div>
 	);
 }

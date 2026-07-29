@@ -132,7 +132,7 @@ const DEG2RAD = PI / 180;
 const EPSILON = 1e-6;
 const COBE_GLOBE_RADIUS = 0.8;
 const DEFAULT_GLOBE_SCALE = 1;
-const AUTO_ROTATE_SPEED = (2 * PI) / 30;
+const AUTO_ROTATE_SPEED = (2 * PI) / 45;
 const ROTATE_SENSITIVITY = 0.005;
 const SMOOTHING_STRENGTH = 14;
 const LOCKED_POLAR_ANGLE = 1.5;
@@ -142,10 +142,10 @@ const MAX_THETA = PI * 0.5 - 0.001;
 const VISIBILITY_MIN_DOT = 0.24;
 const VISIBILITY_MAX_DOT = 0.48;
 const MAX_SHADER_MARKERS = 128;
-const SHADER_MARKER_SIZE_SCALE = 0.5;
+const SHADER_MARKER_SIZE_SCALE = 0.3;
 const MIN_SHADER_MARKER_SIZE = 0.003;
 const MAX_SHADER_MARKER_SIZE = 0.06;
-const FOCUS_TWEEN_DURATION = 1.5;
+const FOCUS_TWEEN_DURATION = 0.5;
 const FOCUS_TWEEN_EASE = 'easeInOut';
 
 const defaultFresnelConfig: Required<FresnelConfig> = {
@@ -628,7 +628,9 @@ export default function GlobeScene({
 					vec2 mapUv = pointToMaskUV(samplePoint);
 					float land = texture2D(uLandTexture, mapUv).r;
 
-					float landDots = step(0.5, land) * smoothstep(uPointRadius, 0.0, dis);
+					float dotRadius = uPointRadius * 0.6;
+					float edgeFeather = dotRadius * 0.25;
+					float landDots = step(0.5, land) * (1.0 - smoothstep(dotRadius - edgeFeather, dotRadius, dis));
 
 					float dotNV = clamp(p.z / kSphereRadius, 0.0, 1.0);
 					float rim = pow(1.0 - dotNV, max(0.0001, uRimPower)) * uRimIntensity;
@@ -647,10 +649,10 @@ export default function GlobeScene({
 
 						vec4 marker = uMarkerData[i];
 						float markerDist = length(globePoint - marker.xyz);
-						float markerCore = smoothstep(marker.w, marker.w * 0.62, markerDist);
+						float markerCore = smoothstep(marker.w, marker.w * 0.9, markerDist);
 						float pulse = fract(uTime * 0.85 + float(i) * 0.173);
 						float pulseRadius = marker.w * mix(1.15, 2.8, pulse);
-						float pulseWidth = marker.w * 0.42;
+						float pulseWidth = marker.w * 0.12;
 						float pulseInner = smoothstep(
 							pulseRadius - pulseWidth,
 							pulseRadius,
@@ -941,8 +943,8 @@ export default function GlobeScene({
 		image.onload = () => {
 			if (disposed) return;
 			landTexture.image = image;
-			landTexture.generateMipmaps = true;
-			landTexture.minFilter = gl.NEAREST_MIPMAP_NEAREST;
+			landTexture.generateMipmaps = false;
+			landTexture.minFilter = gl.NEAREST;
 			landTexture.magFilter = gl.NEAREST;
 			landTexture.needsUpdate = true;
 		};

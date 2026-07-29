@@ -145,7 +145,7 @@ export default function GlobeMarkerItem({
 				<div
 					ref={tooltipRef}
 					className={cn(
-						'absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-8 flex-col items-center transition-[opacity,filter,box-shadow] duration-200 ease-out select-none',
+						'absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-8 flex-col items-center rounded-[9000px] transition-[opacity,filter,box-shadow] duration-200 ease-out select-none',
 						onSelect
 							? 't-avatar pointer-events-auto cursor-pointer hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]'
 							: 'pointer-events-none'

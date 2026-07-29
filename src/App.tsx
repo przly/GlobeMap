@@ -73,13 +73,13 @@ export default function App() {
 		return (
 			<div
 				className={cn(
-					'relative flex items-center gap-1.5 rounded-[9000px] border px-2.5 py-1.5 text-xs font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color] duration-300',
+					'relative flex items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color] duration-300',
 					focused
-						? 'border-transparent bg-[#041c2c] text-white'
-						: 'border-black/10 bg-white text-black'
+						? 'border-[#42515d] bg-[#041c2c] text-white'
+						: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'
 				)}
 			>
-				<span className="size-[10px] shrink-0 rounded-full bg-[#44d62c]" />
+				<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
 				{marker.label}
 			</div>
 		);

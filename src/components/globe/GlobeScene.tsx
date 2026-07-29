@@ -95,6 +95,13 @@ interface Props {
 	 */
 	onMarkerClick?: (marker: GlobeMarker, index: number) => void;
 	/**
+	 * Called when the canvas background is tapped/clicked directly — a plain
+	 * tap, not a drag-to-rotate gesture. Marker tooltips are separate DOM
+	 * elements layered on top of the canvas, so clicking one never reaches
+	 * this handler regardless of where it sits on the globe.
+	 */
+	onBackgroundClick?: () => void;
+	/**
 	 * Coordinates [lat, lon] to focus on.
 	 */
 	focusOn?: [number, number] | null;
@@ -294,6 +301,7 @@ export default function GlobeScene({
 	markers = [],
 	markerTooltip,
 	onMarkerClick,
+	onBackgroundClick,
 	focusOn = null
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -322,7 +330,8 @@ export default function GlobeScene({
 		axialTilt,
 		lockedPolarAngle,
 		autoRotate,
-		markers
+		markers,
+		onBackgroundClick
 	});
 	useEffect(() => {
 		latestRef.current = {
@@ -333,7 +342,8 @@ export default function GlobeScene({
 			axialTilt,
 			lockedPolarAngle,
 			autoRotate,
-			markers
+			markers,
+			onBackgroundClick
 		};
 	});
 
@@ -895,10 +905,15 @@ export default function GlobeScene({
 
 		syncFocusTarget(focusOn);
 
+		// A pointer session that never moves more than this many pixels between
+		// down and up reads as a tap/click rather than a drag-to-rotate gesture.
+		const TAP_DISTANCE_THRESHOLD = 6;
+
 		let dragging = false;
 		let activePointerId = -1;
 		let lastPointerX = 0;
 		let lastPointerY = 0;
+		let dragDistance = 0;
 
 		const onPointerDown = (event: PointerEvent) => {
 			if (event.button !== 0) return;
@@ -906,6 +921,7 @@ export default function GlobeScene({
 			activePointerId = event.pointerId;
 			lastPointerX = event.clientX;
 			lastPointerY = event.clientY;
+			dragDistance = 0;
 			targetCanvas.setPointerCapture(event.pointerId);
 			focusAnimation?.stop();
 			focusAnimation = null;
@@ -918,12 +934,23 @@ export default function GlobeScene({
 			const dy = event.clientY - lastPointerY;
 			lastPointerX = event.clientX;
 			lastPointerY = event.clientY;
+			dragDistance += Math.hypot(dx, dy);
 
 			targetPhi += dx * ROTATE_SENSITIVITY;
 			targetTheta = clampTheta(
 				targetTheta + dy * ROTATE_SENSITIVITY,
 				latestRef.current.lockedPolarAngle
 			);
+		};
+
+		const onPointerUp = (event: PointerEvent) => {
+			if (event.pointerId !== activePointerId) return;
+			const wasTap = dragging && dragDistance < TAP_DISTANCE_THRESHOLD;
+			dragging = false;
+			activePointerId = -1;
+			if (wasTap) {
+				latestRef.current.onBackgroundClick?.();
+			}
 		};
 
 		const stopDragging = (event: PointerEvent) => {
@@ -934,7 +961,7 @@ export default function GlobeScene({
 
 		targetCanvas.addEventListener('pointerdown', onPointerDown);
 		targetCanvas.addEventListener('pointermove', onPointerMove);
-		targetCanvas.addEventListener('pointerup', stopDragging);
+		targetCanvas.addEventListener('pointerup', onPointerUp);
 		targetCanvas.addEventListener('pointercancel', stopDragging);
 		targetCanvas.addEventListener('lostpointercapture', stopDragging);
 
@@ -1000,7 +1027,7 @@ export default function GlobeScene({
 			window.cancelAnimationFrame(raf);
 			targetCanvas.removeEventListener('pointerdown', onPointerDown);
 			targetCanvas.removeEventListener('pointermove', onPointerMove);
-			targetCanvas.removeEventListener('pointerup', stopDragging);
+			targetCanvas.removeEventListener('pointerup', onPointerUp);
 			targetCanvas.removeEventListener('pointercancel', stopDragging);
 			targetCanvas.removeEventListener('lostpointercapture', stopDragging);
 

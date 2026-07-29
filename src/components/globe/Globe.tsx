@@ -83,6 +83,11 @@ interface Props extends Omit<ComponentPropsWithoutRef<'div'>, 'className'> {
 	 */
 	onMarkerClick?: SceneProps['onMarkerClick'];
 	/**
+	 * Called when the canvas background is tapped/clicked directly (not a
+	 * drag-to-rotate gesture, and not a marker tooltip).
+	 */
+	onBackgroundClick?: SceneProps['onBackgroundClick'];
+	/**
 	 * Coordinates [lat, lon] to focus the camera on.
 	 * When set, auto-rotation will be disabled temporarily.
 	 */
@@ -105,6 +110,7 @@ export default function Globe({
 	markers = [],
 	markerTooltip,
 	onMarkerClick,
+	onBackgroundClick,
 	focusOn = null,
 	...rest
 }: Props) {
@@ -126,6 +132,7 @@ export default function Globe({
 					markers={markers}
 					markerTooltip={markerTooltip}
 					onMarkerClick={onMarkerClick}
+					onBackgroundClick={onBackgroundClick}
 					focusOn={focusOn}
 				/>
 			</div>

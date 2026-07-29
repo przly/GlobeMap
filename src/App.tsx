@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { animate } from 'motion';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
 import { cn } from './lib/cn';
 
-const defaultScale = 1.5;
-const focusScale = 3;
+const DESKTOP_DEFAULT_SCALE = 1.5;
+const DESKTOP_FOCUS_SCALE = 3;
+const MOBILE_DEFAULT_SCALE = 1;
+const MOBILE_FOCUS_SCALE = 1.2;
 
 // Point count is held fixed across zoom levels, so the lattice's sphere-space
 // spacing is fixed too — but a point at fixed sphere-space size projects to
@@ -16,6 +18,11 @@ const focusScale = 3;
 const basePointCount = 35000;
 const basePointSize = 0.07;
 const baseMarkerSize = 0.06;
+
+// Matches the `lg` breakpoint: the desktop layout overlays a 433px heading
+// block and a 244px locations panel side by side inside the globe card, which
+// needs roughly 960px+ of width to avoid the two overlapping.
+const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
 const locations: { label: string; location: [number, number] }[] = [
 	{ label: 'San Francisco', location: [37.7749, -122.4194] },
@@ -36,9 +43,42 @@ function isFocused(focusOn: [number, number] | null, location: [number, number])
 	return focusOn !== null && focusOn[0] === location[0] && focusOn[1] === location[1];
 }
 
+// The globe's offsetX is a shader uniform, not a CSS value, so it can't be
+// gated behind a Tailwind breakpoint — it needs to be read from JS instead.
+function useIsDesktop() {
+	const [isDesktop, setIsDesktop] = useState(() =>
+		typeof window === 'undefined' ? true : window.matchMedia(DESKTOP_MEDIA_QUERY).matches
+	);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia(DESKTOP_MEDIA_QUERY);
+		const onChange = () => setIsDesktop(mediaQuery.matches);
+		onChange();
+		mediaQuery.addEventListener('change', onChange);
+		return () => mediaQuery.removeEventListener('change', onChange);
+	}, []);
+
+	return isDesktop;
+}
+
 export default function App() {
+	const isDesktop = useIsDesktop();
+	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
+	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
 	const [scale, setScale] = useState(defaultScale);
 	const [focusOn, setFocusOn] = useState<[number, number] | null>(null);
+
+	// isDesktop is only known for certain after mount (SSR/first paint assumes
+	// desktop), and can change later from an actual viewport resize. Re-sync
+	// `scale` to the new breakpoint's default during render (React's supported
+	// pattern for "adjust state when a prop changes") rather than in an
+	// effect, but only when not focused, so a resize can't yank the view out
+	// from under an active selection.
+	const [prevIsDesktop, setPrevIsDesktop] = useState(isDesktop);
+	if (isDesktop !== prevIsDesktop) {
+		setPrevIsDesktop(isDesktop);
+		if (!focusOn) setScale(defaultScale);
+	}
 
 	const pointCount = basePointCount;
 	const pointSize = basePointSize;
@@ -68,6 +108,12 @@ export default function App() {
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
 	}
 
+	function deselectLocation() {
+		if (!focusOn) return;
+		setFocusOn(null);
+		animateScaleTo(defaultScale);
+	}
+
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
 		const focused = isFocused(focusOn, marker.location);
 		return (
@@ -85,13 +131,44 @@ export default function App() {
 		);
 	}
 
+	function renderLocationRows() {
+		return locations.map((loc) => {
+			const focused = isFocused(focusOn, loc.location);
+			return (
+				<button
+					key={loc.label}
+					type="button"
+					onClick={() => selectLocation(loc.location)}
+					className="group relative min-h-[26px] w-full shrink-0 overflow-hidden rounded-full"
+				>
+					{focused ? (
+						<span className="absolute inset-0 rounded-full bg-[#44d62c]" />
+					) : (
+						<span className="absolute inset-0 -translate-x-full rounded-full bg-[#f4f6f7] transition-transform duration-200 ease-out group-hover:translate-x-0" />
+					)}
+					<span
+						className={`relative block p-[12px] text-left font-['Inter'] text-[14px] leading-none font-normal tracking-[-0.28px] ${
+							focused ? 'text-white' : 'text-[#7c868e]'
+						}`}
+					>
+						{loc.label}
+					</span>
+				</button>
+			);
+		});
+	}
+
 	return (
-		<div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-white p-6">
-			<main className="relative flex h-[700px] w-full items-center justify-center overflow-hidden rounded-[24px] border-[0.5px] border-[#cbd1d6] bg-white">
+		<div className="flex min-h-screen w-full flex-col items-center gap-4 bg-white p-6 lg:justify-center">
+			<main className="relative flex h-auto w-full shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[0.5px] border-[#cbd1d6] bg-white aspect-[361/674] lg:aspect-auto lg:h-[700px] lg:rounded-[24px]">
 				<Globe
-					className="h-full w-full"
+					className={cn(
+						'absolute left-[-15%] w-[130%] transition-[top,height] duration-500 ease-in-out',
+						focusOn ? 'top-0 h-full' : 'top-[80%] h-[20%]',
+						'lg:inset-0 lg:top-auto lg:left-auto lg:h-full lg:w-full'
+					)}
 					scale={scale}
-					offsetX={1 / 6}
+					offsetX={isDesktop ? 1 / 6 : 0}
 					rotation={5}
 					axialTilt={-23}
 					pointCount={pointCount}
@@ -101,19 +178,20 @@ export default function App() {
 					markers={markers}
 					markerTooltip={renderMarkerTooltip}
 					onMarkerClick={(marker) => selectLocation(marker.location)}
+					onBackgroundClick={deselectLocation}
 					focusOn={focusOn}
 					autoRotate={!focusOn}
 					lockedPolarAngle={!focusOn}
 				/>
 
-				<div className="absolute top-[47.5px] left-[47.5px] flex items-center gap-[48px]">
+				<div className="absolute top-[47.5px] left-[47.5px] hidden items-center gap-[48px] lg:flex">
 					<span className="size-[10px] shrink-0 rounded-full bg-[#44d62c]" />
 					<span className="font-['Geist_Mono'] text-[12px] leading-[1.05] font-normal text-[#7c868e] uppercase">
 						locations
 					</span>
 				</div>
 
-				<div className="absolute bottom-[47.5px] left-[47.5px] flex w-[433px] flex-col gap-[16px]">
+				<div className="absolute bottom-[47.5px] left-[47.5px] hidden w-[433px] flex-col gap-[16px] lg:flex">
 					<p className="font-['Inter'] text-[48px] leading-[1.05] font-medium tracking-[-1.44px] text-[#041c2c]">
 						Built across Europe, <span className="text-[#7c868e]">with local partners.</span>
 					</p>
@@ -122,39 +200,45 @@ export default function App() {
 					</p>
 				</div>
 
-				<div className="absolute right-[12.5px] bottom-[12.5px] flex h-[502px] w-[244px] flex-col overflow-hidden rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white">
+				<div className="absolute right-[12.5px] bottom-[12.5px] hidden h-[502px] w-[244px] flex-col overflow-hidden rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white lg:flex">
 					<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-['Geist_Mono'] text-[12px] leading-none font-normal tracking-[-0.24px] text-[#7c868e] uppercase">
 						locations
 					</span>
 					<div className="mx-[11.5px] shrink-0 border-t-[0.5px] border-[#cbd1d6]" />
 					<div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto px-[11.5px] pt-[8px] pb-[11.5px]">
-						{locations.map((loc) => {
-							const focused = isFocused(focusOn, loc.location);
-							return (
-								<button
-									key={loc.label}
-									type="button"
-									onClick={() => selectLocation(loc.location)}
-									className="group relative min-h-[26px] w-full shrink-0 overflow-hidden rounded-full"
-								>
-									{focused ? (
-										<span className="absolute inset-0 rounded-full bg-[#44d62c]" />
-									) : (
-										<span className="absolute inset-0 -translate-x-full rounded-full bg-[#f4f6f7] transition-transform duration-200 ease-out group-hover:translate-x-0" />
-									)}
-									<span
-										className={`relative block p-[12px] text-left font-['Inter'] text-[14px] leading-none font-normal tracking-[-0.28px] ${
-											focused ? 'text-white' : 'text-[#7c868e]'
-										}`}
-									>
-										{loc.label}
-									</span>
-								</button>
-							);
-						})}
+						{renderLocationRows()}
 					</div>
 				</div>
+
+				<div className="pointer-events-none absolute top-8 left-8 flex w-[calc(100%-64px)] flex-col items-start gap-4 lg:hidden">
+					<p className="font-['Inter'] text-[36px] leading-none font-medium tracking-[-0.72px] text-[#041c2c]">
+						<span className="leading-none">Built across Europe, </span>
+						<span className="leading-none text-[#7c868e]">with local partners.</span>
+					</p>
+					<p className="font-['Inter'] text-[16px] leading-[1.5] font-medium text-[#7c868e]">
+						See where NGEN operates and find relevant projects, offices and partners near you.
+					</p>
+					<button
+						type="button"
+						className="pointer-events-auto inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-4 py-3 text-sm font-normal text-white"
+					>
+						About NGEN
+						<span aria-hidden="true" className="text-sm leading-none">
+							→
+						</span>
+					</button>
+				</div>
 			</main>
+
+			<div className="flex max-h-[260px] w-full flex-col overflow-hidden rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden">
+				<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-['Geist_Mono'] text-[12px] leading-none font-normal tracking-[-0.24px] text-[#7c868e] uppercase">
+					locations
+				</span>
+				<div className="mx-[11.5px] shrink-0 border-t-[0.5px] border-[#cbd1d6]" />
+				<div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto px-[11.5px] pt-[8px] pb-[11.5px]">
+					{renderLocationRows()}
+				</div>
+			</div>
 		</div>
 	);
 }

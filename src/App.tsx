@@ -197,7 +197,7 @@ export default function App() {
 					pointCount={pointCount}
 					pointSize={pointSize}
 					landPointColor="#44d62c"
-					fresnelConfig={{ color: '#e4e4e4', rimColor: '#44d62c' }}
+					fresnelConfig={{ color: '#E6EAED', rimColor: '#44D62C' }}
 					markers={markers}
 					markerTooltip={renderMarkerTooltip}
 					onMarkerClick={(marker) => selectLocation(marker.location)}

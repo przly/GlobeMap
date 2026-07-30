@@ -88,10 +88,9 @@ interface Props extends Omit<ComponentPropsWithoutRef<'div'>, 'className'> {
 	 */
 	onBackgroundClick?: SceneProps['onBackgroundClick'];
 	/**
-	 * Called continuously during a two-finger touch gesture with the scale
-	 * that gesture implies (pinch-to-zoom).
+	 * Called when the canvas background is double-tapped (touch only).
 	 */
-	onScaleChange?: SceneProps['onScaleChange'];
+	onDoubleTap?: SceneProps['onDoubleTap'];
 	/**
 	 * Coordinates [lat, lon] to focus the camera on.
 	 * When set, auto-rotation will be disabled temporarily.
@@ -116,7 +115,7 @@ export default function Globe({
 	markerTooltip,
 	onMarkerClick,
 	onBackgroundClick,
-	onScaleChange,
+	onDoubleTap,
 	focusOn = null,
 	...rest
 }: Props) {
@@ -139,7 +138,7 @@ export default function Globe({
 					markerTooltip={markerTooltip}
 					onMarkerClick={onMarkerClick}
 					onBackgroundClick={onBackgroundClick}
-					onScaleChange={onScaleChange}
+					onDoubleTap={onDoubleTap}
 					focusOn={focusOn}
 				/>
 			</div>

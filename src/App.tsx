@@ -75,6 +75,9 @@ export default function App() {
 	const offsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
 	const [scale, setScale] = useState(defaultScale);
 	const [focusOn, setFocusOn] = useState<[number, number] | null>(null);
+	// Mobile has no pinch gesture, so double-tapping the globe toggles
+	// between the default and focus zoom levels instead.
+	const [isDoubleTapZoomed, setIsDoubleTapZoomed] = useState(false);
 
 	// isDesktop is only known for certain after mount (SSR/first paint assumes
 	// desktop), and can change later from an actual viewport resize. Re-sync
@@ -103,13 +106,6 @@ export default function App() {
 		});
 	}
 
-	// Driven by GlobeScene's two-finger pinch gesture. Stops any in-flight
-	// focus-scale animation so it can't fight the user's fingers.
-	function handlePinchScaleChange(next: number) {
-		scaleAnimationRef.current?.stop();
-		setScale(next);
-	}
-
 	const markers: GlobeMarker[] = locations.map(({ label, location }) => ({
 		location,
 		label,
@@ -120,13 +116,25 @@ export default function App() {
 	function selectLocation(location: [number, number]) {
 		const nextFocus = isFocused(focusOn, location) ? null : location;
 		setFocusOn(nextFocus);
+		setIsDoubleTapZoomed(false);
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
 	}
 
 	function deselectLocation() {
 		if (!focusOn) return;
 		setFocusOn(null);
+		setIsDoubleTapZoomed(false);
 		animateScaleTo(defaultScale);
+	}
+
+	// Mobile-only (see the Globe element below): double-tapping empty globe
+	// background toggles in and out of the focus zoom level, since there's
+	// no pinch gesture to zoom with.
+	function toggleDoubleTapZoom() {
+		if (focusOn) return;
+		const zoomed = !isDoubleTapZoomed;
+		setIsDoubleTapZoomed(zoomed);
+		animateScaleTo(zoomed ? focusScale : defaultScale);
 	}
 
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
@@ -194,10 +202,10 @@ export default function App() {
 					markerTooltip={renderMarkerTooltip}
 					onMarkerClick={(marker) => selectLocation(marker.location)}
 					onBackgroundClick={deselectLocation}
-					onScaleChange={handlePinchScaleChange}
+					onDoubleTap={isDesktop ? undefined : toggleDoubleTapZoom}
 					focusOn={focusOn}
 					autoRotate={!focusOn}
-					lockedPolarAngle={!focusOn}
+					lockedPolarAngle={isDesktop ? !focusOn : false}
 				/>
 
 				<div className="absolute top-[47.5px] left-[47.5px] hidden items-center gap-[48px] lg:flex">

@@ -102,12 +102,11 @@ interface Props {
 	 */
 	onBackgroundClick?: () => void;
 	/**
-	 * Called continuously during a two-finger touch gesture with the scale
-	 * that gesture implies (pinch-to-zoom), clamped to a sane range. Two
-	 * fingers moving together rotates the globe the same way a single
-	 * finger would; only their distance apart drives this callback.
+	 * Called when the canvas background is double-tapped (touch only — mouse
+	 * double-clicks are ignored). Fires instead of a second onBackgroundClick
+	 * call for that tap, not in addition to it.
 	 */
-	onScaleChange?: (scale: number) => void;
+	onDoubleTap?: () => void;
 	/**
 	 * Coordinates [lat, lon] to focus on.
 	 */
@@ -161,8 +160,10 @@ const MIN_SHADER_MARKER_SIZE = 0.003;
 const MAX_SHADER_MARKER_SIZE = 0.06;
 const FOCUS_TWEEN_DURATION = 0.5;
 const FOCUS_TWEEN_EASE = 'easeInOut';
-const PINCH_MIN_SCALE = 0.3;
-const PINCH_MAX_SCALE = 6;
+// A second tap within this time and distance of the first counts as a
+// double-tap rather than two separate taps.
+const DOUBLE_TAP_MAX_INTERVAL_MS = 300;
+const DOUBLE_TAP_MAX_DISTANCE = 24;
 
 const defaultFresnelConfig: Required<FresnelConfig> = {
 	color: '#17181A',
@@ -311,7 +312,7 @@ export default function GlobeScene({
 	markerTooltip,
 	onMarkerClick,
 	onBackgroundClick,
-	onScaleChange,
+	onDoubleTap,
 	focusOn = null
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -342,7 +343,7 @@ export default function GlobeScene({
 		autoRotate,
 		markers,
 		onBackgroundClick,
-		onScaleChange
+		onDoubleTap
 	});
 	useEffect(() => {
 		latestRef.current = {
@@ -355,7 +356,7 @@ export default function GlobeScene({
 			autoRotate,
 			markers,
 			onBackgroundClick,
-			onScaleChange
+			onDoubleTap
 		};
 	});
 
@@ -402,14 +403,6 @@ export default function GlobeScene({
 
 		targetCanvas.style.width = '100%';
 		targetCanvas.style.height = '100%';
-		// Single-finger vertical swipes fall through to the browser as a page
-		// scroll; horizontal ones are captured below for drag-to-rotate. This
-		// is toggled to 'none' for the duration of a two-finger gesture (see
-		// onPointerDown/releasePointer) so the page can't also scroll while
-		// two fingers are pinching/rotating the globe. Set imperatively here
-		// (not via the React style prop) so re-renders during a gesture —
-		// scale changes constantly while pinching — can't reset it mid-touch.
-		targetCanvas.style.touchAction = 'pan-y';
 
 		const camera = new Camera(gl);
 		camera.position.z = 1;
@@ -935,114 +928,26 @@ export default function GlobeScene({
 		let lastPointerY = 0;
 		let dragDistance = 0;
 
-		// Tracks every pointer currently down on the canvas (by client coords).
-		// A second simultaneous pointer switches the gesture from single-finger
-		// drag-to-rotate to two-finger pinch-to-zoom — the pair's distance
-		// drives zoom, and their midpoint drives rotation exactly like a
-		// single-finger drag would, so two fingers still rotates rather than
-		// panning the view.
-		const activePointers = new Map<number, { clientX: number; clientY: number }>();
-
-		interface PinchState {
-			lastDistance: number;
-			lastMidX: number;
-			lastMidY: number;
-		}
-		let pinch: PinchState | null = null;
-
-		const toLocalPoint = (clientX: number, clientY: number) => {
-			const rect = targetCanvas.getBoundingClientRect();
-			return { x: clientX - rect.left, y: clientY - rect.top };
-		};
-
-		const pinchLocalPoints = () => {
-			const [a, b] = Array.from(activePointers.values());
-			return { a: toLocalPoint(a.clientX, a.clientY), b: toLocalPoint(b.clientX, b.clientY) };
-		};
-
-		const pinchDistance = () => {
-			const { a, b } = pinchLocalPoints();
-			return Math.hypot(a.x - b.x, a.y - b.y);
-		};
-
-		const pinchMidpoint = () => {
-			const { a, b } = pinchLocalPoints();
-			return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-		};
-
-		const startPinch = () => {
-			const dist = pinchDistance();
-			if (dist < 1) return;
-			const mid = pinchMidpoint();
-			pinch = { lastDistance: dist, lastMidX: mid.x, lastMidY: mid.y };
-		};
-
-		const updatePinch = () => {
-			if (!pinch) return;
-			const dist = pinchDistance();
-			const mid = pinchMidpoint();
-
-			if (dist >= 1 && pinch.lastDistance >= 1) {
-				const scaleFactor = dist / pinch.lastDistance;
-				const nextScale = clamp(
-					latestRef.current.scale * scaleFactor,
-					PINCH_MIN_SCALE,
-					PINCH_MAX_SCALE
-				);
-				latestRef.current.onScaleChange?.(nextScale);
-			}
-
-			const dx = mid.x - pinch.lastMidX;
-			const dy = mid.y - pinch.lastMidY;
-			targetPhi += dx * ROTATE_SENSITIVITY;
-			// A two-finger hold always frees the polar axis too, regardless of
-			// lockedPolarAngle — unlike a single-finger drag, which respects it.
-			targetTheta = clampTheta(targetTheta + dy * ROTATE_SENSITIVITY, false);
-
-			pinch.lastDistance = dist;
-			pinch.lastMidX = mid.x;
-			pinch.lastMidY = mid.y;
-		};
+		// Tracks the most recent tap (touch only) to detect a double-tap: a
+		// second tap close enough in time and position to the first.
+		let lastTapTime = 0;
+		let lastTapX = 0;
+		let lastTapY = 0;
 
 		const onPointerDown = (event: PointerEvent) => {
 			if (event.button !== 0) return;
-			targetCanvas.setPointerCapture(event.pointerId);
-			activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
-			focusAnimation?.stop();
-			focusAnimation = null;
-			returningToDefault = false;
-
-			if (activePointers.size >= 2) {
-				dragging = false;
-				activePointerId = -1;
-				// Disables the browser's native vertical-pan handling for the
-				// rest of this gesture, so a two-finger rotate (both touches
-				// moving together) can't also be read as a page scroll.
-				targetCanvas.style.touchAction = 'none';
-				startPinch();
-				return;
-			}
-
 			dragging = true;
 			activePointerId = event.pointerId;
 			lastPointerX = event.clientX;
 			lastPointerY = event.clientY;
 			dragDistance = 0;
+			targetCanvas.setPointerCapture(event.pointerId);
+			focusAnimation?.stop();
+			focusAnimation = null;
+			returningToDefault = false;
 		};
 
 		const onPointerMove = (event: PointerEvent) => {
-			if (activePointers.has(event.pointerId)) {
-				activePointers.set(event.pointerId, {
-					clientX: event.clientX,
-					clientY: event.clientY
-				});
-			}
-
-			if (activePointers.size >= 2) {
-				updatePinch();
-				return;
-			}
-
 			if (!dragging || event.pointerId !== activePointerId) return;
 			const dx = event.clientX - lastPointerX;
 			const dy = event.clientY - lastPointerY;
@@ -1057,50 +962,38 @@ export default function GlobeScene({
 			);
 		};
 
-		const releasePointer = (event: PointerEvent) => {
-			activePointers.delete(event.pointerId);
-
-			if (activePointers.size >= 2) {
-				// A third finger was down too — keep pinching with whichever two
-				// remain, re-anchored from their current positions.
-				startPinch();
-				dragging = false;
-				activePointerId = -1;
-				return;
-			}
-
-			pinch = null;
-			// Back below two touches — restore native vertical-pan handling so
-			// a lone remaining (or new) finger can scroll the page again.
-			targetCanvas.style.touchAction = 'pan-y';
-
-			if (activePointers.size === 1) {
-				// One finger remains after a pinch — resume single-finger
-				// drag-to-rotate from its current position, with no jump.
-				const [[id, p]] = activePointers;
-				dragging = true;
-				activePointerId = id;
-				lastPointerX = p.clientX;
-				lastPointerY = p.clientY;
-				dragDistance = TAP_DISTANCE_THRESHOLD;
-				return;
-			}
-
+		const onPointerUp = (event: PointerEvent) => {
+			if (event.pointerId !== activePointerId) return;
+			const wasTap = dragging && dragDistance < TAP_DISTANCE_THRESHOLD;
 			dragging = false;
 			activePointerId = -1;
-		};
+			if (!wasTap) return;
 
-		const onPointerUp = (event: PointerEvent) => {
-			const wasTap =
-				dragging && event.pointerId === activePointerId && dragDistance < TAP_DISTANCE_THRESHOLD;
-			releasePointer(event);
-			if (wasTap) {
-				latestRef.current.onBackgroundClick?.();
+			if (event.pointerType === 'touch') {
+				const dx = event.clientX - lastTapX;
+				const dy = event.clientY - lastTapY;
+				const isDoubleTap =
+					event.timeStamp - lastTapTime <= DOUBLE_TAP_MAX_INTERVAL_MS &&
+					Math.hypot(dx, dy) <= DOUBLE_TAP_MAX_DISTANCE;
+
+				if (isDoubleTap) {
+					lastTapTime = 0;
+					latestRef.current.onDoubleTap?.();
+					return;
+				}
+
+				lastTapTime = event.timeStamp;
+				lastTapX = event.clientX;
+				lastTapY = event.clientY;
 			}
+
+			latestRef.current.onBackgroundClick?.();
 		};
 
 		const stopDragging = (event: PointerEvent) => {
-			releasePointer(event);
+			if (event.pointerId !== activePointerId) return;
+			dragging = false;
+			activePointerId = -1;
 		};
 
 		targetCanvas.addEventListener('pointerdown', onPointerDown);
@@ -1146,16 +1039,10 @@ export default function GlobeScene({
 			previous = now;
 			uniforms.uTime.value += delta;
 
-			// A two-finger hold pauses auto-rotate too, so it can't fight the
-			// gesture's own phi/theta changes.
-			if (live.autoRotate && !pinch) {
+			if (live.autoRotate) {
 				targetPhi -= AUTO_ROTATE_SPEED * delta;
 			}
-			// A two-finger hold frees the polar axis regardless of
-			// lockedPolarAngle — bypass this frame's re-lock while pinching, or
-			// it would snap targetTheta straight back before the next touch
-			// event has a chance to move it.
-			targetTheta = clampTheta(targetTheta, live.lockedPolarAngle && !returningToDefault && !pinch);
+			targetTheta = clampTheta(targetTheta, live.lockedPolarAngle && !returningToDefault);
 
 			const easing = 1 - Math.exp(-delta * SMOOTHING_STRENGTH);
 			phi += (targetPhi - phi) * easing;
@@ -1193,7 +1080,7 @@ export default function GlobeScene({
 			<canvas
 				ref={canvasRef}
 				className="absolute inset-0 block h-full w-full"
-				style={{ width: '100%', height: '100%' }}
+				style={{ width: '100%', height: '100%', touchAction: 'pan-y' }}
 				aria-hidden="true"
 			/>
 			<div className="pointer-events-none absolute inset-0 overflow-hidden">

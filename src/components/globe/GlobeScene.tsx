@@ -1043,7 +1043,7 @@ export default function GlobeScene({
 			<canvas
 				ref={canvasRef}
 				className="absolute inset-0 block h-full w-full"
-				style={{ width: '100%', height: '100%', touchAction: 'none' }}
+				style={{ width: '100%', height: '100%', touchAction: 'pan-y' }}
 				aria-hidden="true"
 			/>
 			<div className="pointer-events-none absolute inset-0 overflow-hidden">

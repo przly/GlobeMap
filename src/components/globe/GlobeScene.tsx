@@ -402,6 +402,14 @@ export default function GlobeScene({
 
 		targetCanvas.style.width = '100%';
 		targetCanvas.style.height = '100%';
+		// Single-finger vertical swipes fall through to the browser as a page
+		// scroll; horizontal ones are captured below for drag-to-rotate. This
+		// is toggled to 'none' for the duration of a two-finger gesture (see
+		// onPointerDown/releasePointer) so the page can't also scroll while
+		// two fingers are pinching/rotating the globe. Set imperatively here
+		// (not via the React style prop) so re-renders during a gesture —
+		// scale changes constantly while pinching — can't reset it mid-touch.
+		targetCanvas.style.touchAction = 'pan-y';
 
 		const camera = new Camera(gl);
 		camera.position.z = 1;
@@ -1007,6 +1015,10 @@ export default function GlobeScene({
 			if (activePointers.size >= 2) {
 				dragging = false;
 				activePointerId = -1;
+				// Disables the browser's native vertical-pan handling for the
+				// rest of this gesture, so a two-finger rotate (both touches
+				// moving together) can't also be read as a page scroll.
+				targetCanvas.style.touchAction = 'none';
 				startPinch();
 				return;
 			}
@@ -1058,6 +1070,9 @@ export default function GlobeScene({
 			}
 
 			pinch = null;
+			// Back below two touches — restore native vertical-pan handling so
+			// a lone remaining (or new) finger can scroll the page again.
+			targetCanvas.style.touchAction = 'pan-y';
 
 			if (activePointers.size === 1) {
 				// One finger remains after a pinch — resume single-finger
@@ -1178,7 +1193,7 @@ export default function GlobeScene({
 			<canvas
 				ref={canvasRef}
 				className="absolute inset-0 block h-full w-full"
-				style={{ width: '100%', height: '100%', touchAction: 'pan-y' }}
+				style={{ width: '100%', height: '100%' }}
 				aria-hidden="true"
 			/>
 			<div className="pointer-events-none absolute inset-0 overflow-hidden">

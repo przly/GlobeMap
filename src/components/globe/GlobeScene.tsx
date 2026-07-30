@@ -102,6 +102,19 @@ interface Props {
 	 */
 	onBackgroundClick?: () => void;
 	/**
+	 * Called continuously during a two-finger touch gesture with the scale
+	 * that gesture implies (pinch-to-zoom), clamped to a sane range. Only
+	 * fires when two pointers are active at once, so it never interferes
+	 * with single-pointer drag-to-rotate.
+	 */
+	onScaleChange?: (scale: number) => void;
+	/**
+	 * Called continuously during a two-finger touch gesture with the
+	 * offsetX/offsetY that gesture implies (pan), anchored so the point
+	 * between the two fingers stays put on screen as the gesture proceeds.
+	 */
+	onOffsetChange?: (offsetX: number, offsetY: number) => void;
+	/**
 	 * Coordinates [lat, lon] to focus on.
 	 */
 	focusOn?: [number, number] | null;
@@ -154,6 +167,8 @@ const MIN_SHADER_MARKER_SIZE = 0.003;
 const MAX_SHADER_MARKER_SIZE = 0.06;
 const FOCUS_TWEEN_DURATION = 0.5;
 const FOCUS_TWEEN_EASE = 'easeInOut';
+const PINCH_MIN_SCALE = 0.3;
+const PINCH_MAX_SCALE = 6;
 
 const defaultFresnelConfig: Required<FresnelConfig> = {
 	color: '#17181A',
@@ -302,6 +317,8 @@ export default function GlobeScene({
 	markerTooltip,
 	onMarkerClick,
 	onBackgroundClick,
+	onScaleChange,
+	onOffsetChange,
 	focusOn = null
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -331,7 +348,9 @@ export default function GlobeScene({
 		lockedPolarAngle,
 		autoRotate,
 		markers,
-		onBackgroundClick
+		onBackgroundClick,
+		onScaleChange,
+		onOffsetChange
 	});
 	useEffect(() => {
 		latestRef.current = {
@@ -343,7 +362,9 @@ export default function GlobeScene({
 			lockedPolarAngle,
 			autoRotate,
 			markers,
-			onBackgroundClick
+			onBackgroundClick,
+			onScaleChange,
+			onOffsetChange
 		};
 	});
 
@@ -915,20 +936,125 @@ export default function GlobeScene({
 		let lastPointerY = 0;
 		let dragDistance = 0;
 
+		// Tracks every pointer currently down on the canvas (by client coords).
+		// A second simultaneous pointer switches the gesture from single-finger
+		// drag-to-rotate to two-finger pinch-to-zoom-and-pan.
+		const activePointers = new Map<number, { clientX: number; clientY: number }>();
+
+		interface PinchState {
+			startDistance: number;
+			startMidX: number;
+			startMidY: number;
+			startScale: number;
+			startOffsetX: number;
+			startOffsetY: number;
+		}
+		let pinch: PinchState | null = null;
+
+		const toLocalPoint = (clientX: number, clientY: number) => {
+			const rect = targetCanvas.getBoundingClientRect();
+			return { x: clientX - rect.left, y: clientY - rect.top };
+		};
+
+		const pinchLocalPoints = () => {
+			const [a, b] = Array.from(activePointers.values());
+			return { a: toLocalPoint(a.clientX, a.clientY), b: toLocalPoint(b.clientX, b.clientY) };
+		};
+
+		const pinchDistance = () => {
+			const { a, b } = pinchLocalPoints();
+			return Math.hypot(a.x - b.x, a.y - b.y);
+		};
+
+		const pinchMidpoint = () => {
+			const { a, b } = pinchLocalPoints();
+			return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+		};
+
+		// Converts a canvas-local pixel position into the same normalized,
+		// canvas-height-relative, y-up coordinate space that offsetX/offsetY
+		// live in (see applyDisplayTransform / the shader's transformUv).
+		const toOffsetSpace = (x: number, y: number) => {
+			const h = Math.max(1, height);
+			return { x: (x - width / 2) / h, y: -(y - height / 2) / h };
+		};
+
+		const startPinch = () => {
+			const dist = pinchDistance();
+			if (dist < 1) return;
+			const mid = pinchMidpoint();
+			pinch = {
+				startDistance: dist,
+				startMidX: mid.x,
+				startMidY: mid.y,
+				startScale: latestRef.current.scale,
+				startOffsetX: latestRef.current.offsetX,
+				startOffsetY: latestRef.current.offsetY
+			};
+		};
+
+		const updatePinch = () => {
+			if (!pinch) return;
+			const dist = pinchDistance();
+			if (dist < 1) return;
+			const mid = pinchMidpoint();
+
+			const rawScale = pinch.startScale * (dist / pinch.startDistance);
+			const nextScale = clamp(rawScale, PINCH_MIN_SCALE, PINCH_MAX_SCALE);
+			// The ratio actually applied, after clamping — using the clamped
+			// ratio (rather than the raw one) keeps the anchor math below exact
+			// even once the pinch has hit the scale limit.
+			const k = nextScale / pinch.startScale;
+
+			const anchor = toOffsetSpace(pinch.startMidX, pinch.startMidY);
+			const target = toOffsetSpace(mid.x, mid.y);
+
+			// Solves for the offset that keeps the sphere-space point under the
+			// fingers' starting position anchored under their current position,
+			// so the globe zooms from (and pans with) the pinch itself instead
+			// of drifting around a fixed origin.
+			const nextOffsetX = target.x - k * (anchor.x - pinch.startOffsetX);
+			const nextOffsetY = target.y - k * (anchor.y - pinch.startOffsetY);
+
+			latestRef.current.onScaleChange?.(nextScale);
+			latestRef.current.onOffsetChange?.(nextOffsetX, nextOffsetY);
+		};
+
 		const onPointerDown = (event: PointerEvent) => {
 			if (event.button !== 0) return;
+			targetCanvas.setPointerCapture(event.pointerId);
+			activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+			focusAnimation?.stop();
+			focusAnimation = null;
+			returningToDefault = false;
+
+			if (activePointers.size >= 2) {
+				dragging = false;
+				activePointerId = -1;
+				startPinch();
+				return;
+			}
+
 			dragging = true;
 			activePointerId = event.pointerId;
 			lastPointerX = event.clientX;
 			lastPointerY = event.clientY;
 			dragDistance = 0;
-			targetCanvas.setPointerCapture(event.pointerId);
-			focusAnimation?.stop();
-			focusAnimation = null;
-			returningToDefault = false;
 		};
 
 		const onPointerMove = (event: PointerEvent) => {
+			if (activePointers.has(event.pointerId)) {
+				activePointers.set(event.pointerId, {
+					clientX: event.clientX,
+					clientY: event.clientY
+				});
+			}
+
+			if (activePointers.size >= 2) {
+				updatePinch();
+				return;
+			}
+
 			if (!dragging || event.pointerId !== activePointerId) return;
 			const dx = event.clientX - lastPointerX;
 			const dy = event.clientY - lastPointerY;
@@ -943,20 +1069,47 @@ export default function GlobeScene({
 			);
 		};
 
-		const onPointerUp = (event: PointerEvent) => {
-			if (event.pointerId !== activePointerId) return;
-			const wasTap = dragging && dragDistance < TAP_DISTANCE_THRESHOLD;
+		const releasePointer = (event: PointerEvent) => {
+			activePointers.delete(event.pointerId);
+
+			if (activePointers.size >= 2) {
+				// A third finger was down too — keep pinching with whichever two
+				// remain, re-anchored from their current positions.
+				startPinch();
+				dragging = false;
+				activePointerId = -1;
+				return;
+			}
+
+			pinch = null;
+
+			if (activePointers.size === 1) {
+				// One finger remains after a pinch — resume single-finger
+				// drag-to-rotate from its current position, with no jump.
+				const [[id, p]] = activePointers;
+				dragging = true;
+				activePointerId = id;
+				lastPointerX = p.clientX;
+				lastPointerY = p.clientY;
+				dragDistance = TAP_DISTANCE_THRESHOLD;
+				return;
+			}
+
 			dragging = false;
 			activePointerId = -1;
+		};
+
+		const onPointerUp = (event: PointerEvent) => {
+			const wasTap =
+				dragging && event.pointerId === activePointerId && dragDistance < TAP_DISTANCE_THRESHOLD;
+			releasePointer(event);
 			if (wasTap) {
 				latestRef.current.onBackgroundClick?.();
 			}
 		};
 
 		const stopDragging = (event: PointerEvent) => {
-			if (event.pointerId !== activePointerId) return;
-			dragging = false;
-			activePointerId = -1;
+			releasePointer(event);
 		};
 
 		targetCanvas.addEventListener('pointerdown', onPointerDown);

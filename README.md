@@ -62,6 +62,87 @@ and gesture logic lives in `GlobeScene`.
 | `onBackgroundClick`               | `() => void`                                          | Fires on a plain tap/click on empty globe (not a drag, not a marker).                                                                                                                                |
 | `onDoubleTap`                     | `() => void`                                          | Fires on a touch double-tap on empty globe (mouse double-clicks are ignored). See below.                                                                                                             |
 
+## Adding locations (CMS integration)
+
+Right now the location list is a hardcoded array at the top of `App.tsx`:
+
+```ts
+const locations: { label: string; location: [number, number] }[] = [
+	{ label: 'San Francisco', location: [37.7749, -122.4194] },
+	{ label: 'New York', location: [40.7128, -74.006] }
+	// ...
+];
+```
+
+This one array is the **single source of truth** for everything
+location-related on the page — both the pins on the globe and the location
+list panel(s) are derived from it further down in `App.tsx`:
+
+```ts
+const markers: GlobeMarker[] = locations.map(({ label, location }) => ({
+	location,
+	label,
+	color: '#041c2c',
+	size: markerSize
+}));
+```
+
+```tsx
+function renderLocationRows() {
+	return locations.map((loc) => {
+		/* ... */
+	});
+}
+```
+
+**To wire this up to a CMS**, replace the hardcoded `const locations = [...]`
+with CMS-fetched data of the same shape — e.g.:
+
+```ts
+const [locations, setLocations] = useState<{ label: string; location: [number, number] }[]>([]);
+
+useEffect(() => {
+	fetchLocationsFromCms().then((entries) =>
+		setLocations(
+			entries.map((entry) => ({
+				label: entry.city, // whatever field holds the display name
+				location: [entry.lat, entry.lng] // see the ordering note below
+			}))
+		)
+	);
+}, []);
+```
+
+Nothing else needs to change — `markers`, `renderLocationRows`,
+`selectLocation`, and the tooltip renderer all just consume whatever is in
+`locations`.
+
+**Required shape per location:**
+
+| Field      | Type               | Notes                                                                                                                                                                                                                                                                          |
+| ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `label`    | `string`           | Display name shown in the marker tooltip and the locations list.                                                                                                                                                                                                               |
+| `location` | `[number, number]` | **`[latitude, longitude]`** — latitude first. This is the reverse of GeoJSON's `[lng, lat]` convention, a common source of bugs when piping in CMS/geocoding data — double check the field order coming out of the CMS. Latitude range `-90..90`, longitude range `-180..180`. |
+
+**Things to watch for when the data becomes dynamic:**
+
+- **Location selection is matched by exact coordinate equality**
+  (`focusOn[0] === location[0] && focusOn[1] === location[1]` in
+  `isFocused()`). If the CMS re-serves the same location with different
+  floating-point precision between requests (e.g. `37.7749` vs
+  `37.77490001`), the currently-selected marker will stop matching and
+  silently deselect. Keep coordinate values stable/normalized coming out of
+  the CMS layer (round to a fixed precision, or key off a stable id and
+  resolve coordinates from a lookup instead of comparing them directly if
+  this becomes a problem).
+- Marker `color` and `size` are currently the same for every location
+  (`#041c2c`, and a size computed from the current zoom level — see
+  `baseMarkerSize` in `App.tsx`). If the CMS should control per-location
+  color/icon, extend the `.map()` above to read those fields from each CMS
+  entry instead of hardcoding them.
+- The globe renders up to 128 markers (`MAX_SHADER_MARKERS` in
+  `GlobeScene.tsx`) — flag this if the CMS could ever exceed that.
+
 ## Desktop vs. mobile implementation
 
 Everything platform-specific lives in `App.tsx`, gated on one `useIsDesktop()`

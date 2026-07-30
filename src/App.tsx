@@ -71,30 +71,21 @@ export default function App() {
 	const isDesktop = useIsDesktop();
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
-	const defaultOffsetX = isDesktop ? 1 / 6 : 0;
-	const defaultOffsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
+	const offsetX = isDesktop ? 1 / 6 : 0;
+	const offsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
 	const [scale, setScale] = useState(defaultScale);
-	// offsetX/offsetY are state (not derived constants) because a two-finger
-	// pinch gesture can freely pan/zoom the globe on mobile — see
-	// onScaleChange/onOffsetChange below.
-	const [offsetX, setOffsetX] = useState(defaultOffsetX);
-	const [offsetY, setOffsetY] = useState(defaultOffsetY);
 	const [focusOn, setFocusOn] = useState<[number, number] | null>(null);
 
 	// isDesktop is only known for certain after mount (SSR/first paint assumes
 	// desktop), and can change later from an actual viewport resize. Re-sync
-	// `scale`/offset to the new breakpoint's default during render (React's
-	// supported pattern for "adjust state when a prop changes") rather than
-	// in an effect, but only when not focused, so a resize can't yank the
-	// view out from under an active selection.
+	// `scale` to the new breakpoint's default during render (React's supported
+	// pattern for "adjust state when a prop changes") rather than in an
+	// effect, but only when not focused, so a resize can't yank the view out
+	// from under an active selection.
 	const [prevIsDesktop, setPrevIsDesktop] = useState(isDesktop);
 	if (isDesktop !== prevIsDesktop) {
 		setPrevIsDesktop(isDesktop);
-		if (!focusOn) {
-			setScale(defaultScale);
-			setOffsetX(defaultOffsetX);
-			setOffsetY(defaultOffsetY);
-		}
+		if (!focusOn) setScale(defaultScale);
 	}
 
 	const pointCount = basePointCount;
@@ -119,11 +110,6 @@ export default function App() {
 		setScale(next);
 	}
 
-	function handlePinchOffsetChange(nextX: number, nextY: number) {
-		setOffsetX(nextX);
-		setOffsetY(nextY);
-	}
-
 	const markers: GlobeMarker[] = locations.map(({ label, location }) => ({
 		location,
 		label,
@@ -135,18 +121,12 @@ export default function App() {
 		const nextFocus = isFocused(focusOn, location) ? null : location;
 		setFocusOn(nextFocus);
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
-		// Selecting/deselecting re-frames the globe deterministically, discarding
-		// any freeform pan/zoom left over from a pinch gesture.
-		setOffsetX(defaultOffsetX);
-		setOffsetY(defaultOffsetY);
 	}
 
 	function deselectLocation() {
 		if (!focusOn) return;
 		setFocusOn(null);
 		animateScaleTo(defaultScale);
-		setOffsetX(defaultOffsetX);
-		setOffsetY(defaultOffsetY);
 	}
 
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
@@ -215,7 +195,6 @@ export default function App() {
 					onMarkerClick={(marker) => selectLocation(marker.location)}
 					onBackgroundClick={deselectLocation}
 					onScaleChange={handlePinchScaleChange}
-					onOffsetChange={handlePinchOffsetChange}
 					focusOn={focusOn}
 					autoRotate={!focusOn}
 					lockedPolarAngle={!focusOn}

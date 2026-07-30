@@ -93,11 +93,6 @@ interface Props extends Omit<ComponentPropsWithoutRef<'div'>, 'className'> {
 	 */
 	onScaleChange?: SceneProps['onScaleChange'];
 	/**
-	 * Called continuously during a two-finger touch gesture with the
-	 * offsetX/offsetY that gesture implies (pan).
-	 */
-	onOffsetChange?: SceneProps['onOffsetChange'];
-	/**
 	 * Coordinates [lat, lon] to focus the camera on.
 	 * When set, auto-rotation will be disabled temporarily.
 	 */
@@ -122,7 +117,6 @@ export default function Globe({
 	onMarkerClick,
 	onBackgroundClick,
 	onScaleChange,
-	onOffsetChange,
 	focusOn = null,
 	...rest
 }: Props) {
@@ -146,7 +140,6 @@ export default function Globe({
 					onMarkerClick={onMarkerClick}
 					onBackgroundClick={onBackgroundClick}
 					onScaleChange={onScaleChange}
-					onOffsetChange={onOffsetChange}
 					focusOn={focusOn}
 				/>
 			</div>

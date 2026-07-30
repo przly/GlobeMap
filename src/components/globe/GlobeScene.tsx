@@ -987,10 +987,9 @@ export default function GlobeScene({
 			const dx = mid.x - pinch.lastMidX;
 			const dy = mid.y - pinch.lastMidY;
 			targetPhi += dx * ROTATE_SENSITIVITY;
-			targetTheta = clampTheta(
-				targetTheta + dy * ROTATE_SENSITIVITY,
-				latestRef.current.lockedPolarAngle
-			);
+			// A two-finger hold always frees the polar axis too, regardless of
+			// lockedPolarAngle — unlike a single-finger drag, which respects it.
+			targetTheta = clampTheta(targetTheta + dy * ROTATE_SENSITIVITY, false);
 
 			pinch.lastDistance = dist;
 			pinch.lastMidX = mid.x;
@@ -1132,10 +1131,16 @@ export default function GlobeScene({
 			previous = now;
 			uniforms.uTime.value += delta;
 
-			if (live.autoRotate) {
+			// A two-finger hold pauses auto-rotate too, so it can't fight the
+			// gesture's own phi/theta changes.
+			if (live.autoRotate && !pinch) {
 				targetPhi -= AUTO_ROTATE_SPEED * delta;
 			}
-			targetTheta = clampTheta(targetTheta, live.lockedPolarAngle && !returningToDefault);
+			// A two-finger hold frees the polar axis regardless of
+			// lockedPolarAngle — bypass this frame's re-lock while pinching, or
+			// it would snap targetTheta straight back before the next touch
+			// event has a chance to move it.
+			targetTheta = clampTheta(targetTheta, live.lockedPolarAngle && !returningToDefault && !pinch);
 
 			const easing = 1 - Math.exp(-delta * SMOOTHING_STRENGTH);
 			phi += (targetPhi - phi) * easing;

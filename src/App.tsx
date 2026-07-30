@@ -165,7 +165,7 @@ export default function App() {
 	}
 
 	return (
-		<div className="flex min-h-screen w-full flex-col items-center gap-4 bg-white p-6 lg:justify-center">
+		<div className="flex min-h-screen w-full flex-col items-center gap-4 bg-white px-4 py-6 lg:justify-center lg:px-6">
 			<main className="relative flex h-auto w-full shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[0.5px] border-[#cbd1d6] bg-white aspect-[361/674] lg:aspect-auto lg:h-[700px] lg:rounded-[24px]">
 				<Globe
 					className={cn(

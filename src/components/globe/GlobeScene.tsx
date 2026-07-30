@@ -282,7 +282,7 @@ function applyDisplayTransform(
 
 	return {
 		x: (ax * cos - ay * sin + offsetX * aspect * 2) / aspect,
-		y: ax * sin + ay * cos - offsetY * 2
+		y: ax * sin + ay * cos + offsetY * 2
 	};
 }
 

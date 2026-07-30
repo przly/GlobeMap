@@ -5,8 +5,14 @@ import { cn } from './lib/cn';
 
 const DESKTOP_DEFAULT_SCALE = 1.5;
 const DESKTOP_FOCUS_SCALE = 3;
-const MOBILE_DEFAULT_SCALE = 1;
-const MOBILE_FOCUS_SCALE = 1.2;
+const MOBILE_DEFAULT_SCALE = 0.6;
+const MOBILE_FOCUS_SCALE = 1.5;
+
+// On mobile the globe's canvas is a fixed size/position (see the Globe
+// className below) — it never resizes or moves. The default-vs-focused
+// "zoom" is achieved purely by animating `scale` around this fixed anchor,
+// so the globe grows/shrinks in place instead of the canvas sliding/resizing.
+const MOBILE_OFFSET_Y = -0.3;
 
 // Point count is held fixed across zoom levels, so the lattice's sphere-space
 // spacing is fixed too — but a point at fixed sphere-space size projects to
@@ -163,12 +169,12 @@ export default function App() {
 			<main className="relative flex h-auto w-full shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[0.5px] border-[#cbd1d6] bg-white aspect-[361/674] lg:aspect-auto lg:h-[700px] lg:rounded-[24px]">
 				<Globe
 					className={cn(
-						'absolute left-[-15%] w-[130%] transition-[top,height] duration-500 ease-in-out',
-						focusOn ? 'top-0 h-full' : 'top-[80%] h-[20%]',
+						'absolute top-0 left-[-15%] h-full w-[130%]',
 						'lg:inset-0 lg:top-auto lg:left-auto lg:h-full lg:w-full'
 					)}
 					scale={scale}
 					offsetX={isDesktop ? 1 / 6 : 0}
+					offsetY={isDesktop ? 0 : MOBILE_OFFSET_Y}
 					rotation={5}
 					axialTilt={-23}
 					pointCount={pointCount}

@@ -143,9 +143,16 @@ export default function GlobeMarkerItem({
 		}
 	};
 
+	// A custom tooltip renderer returning null/false is an explicit "no
+	// tooltip for this marker" — e.g. the selected marker's tag renders
+	// elsewhere, anchored to the location info card, instead of following
+	// this marker's live globe position. Falling through to the fallback
+	// label in that case would show a tooltip the caller asked to suppress.
+	const tooltipContent = tooltip ? tooltip({ marker, index, visibility }) : marker.label;
+
 	return (
 		<div className="pointer-events-none absolute" style={containerStyle}>
-			{tooltip || marker.label ? (
+			{tooltipContent ? (
 				<div
 					ref={tooltipRef}
 					className={cn(
@@ -166,7 +173,7 @@ export default function GlobeMarkerItem({
 					tabIndex={onSelect ? 0 : undefined}
 				>
 					{tooltip ? (
-						tooltip({ marker, index, visibility })
+						tooltipContent
 					) : (
 						<div className="rounded-xs bg-fixed-dark/80 px-2 py-1 text-xs whitespace-nowrap text-fixed-light backdrop-blur-sm">
 							{marker.label}

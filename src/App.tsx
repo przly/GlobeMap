@@ -127,16 +127,14 @@ export default function App() {
 	}
 
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
-		const focused = isFocused(focusOn, marker.location);
+		// The selected marker's tag doesn't render here at all — it's shown
+		// instead as a "resting" tag anchored directly above the location info
+		// card (see the focusedLocation overlay below), rather than following
+		// this marker's live, globe-rotation-dependent screen position.
+		if (isFocused(focusOn, marker.location)) return null;
+
 		return (
-			<div
-				className={cn(
-					'relative flex items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color] duration-300',
-					focused
-						? 'border-[#42515d] bg-[#041c2c] text-white'
-						: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'
-				)}
-			>
+			<div className="relative flex items-center gap-2.5 rounded-[9000px] border border-[#e6eaed] bg-white px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap text-[#041c2c] shadow-lg transition-colors duration-300 hover:bg-[#f4f6f7]">
 				<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
 				{marker.label}
 			</div>
@@ -244,7 +242,14 @@ export default function App() {
 
 				{focusedLocation ? (
 					<div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 flex justify-center lg:inset-x-auto lg:right-[272.5px] lg:bottom-[12.5px] lg:justify-end">
-						<div className="pointer-events-auto">
+						{/* w-fit so this column sizes to its widest child (the card) —
+						    the tag below then centers over the card's own width via
+						    items-center, not the wider positioning wrapper's width. */}
+						<div className="pointer-events-auto flex w-fit flex-col items-center gap-4">
+							<div className="relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap text-white shadow-lg">
+								<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
+								{focusedLocation.label}
+							</div>
 							<LocationInfoCard location={focusedLocation} />
 						</div>
 					</div>

@@ -144,10 +144,8 @@ export default function GlobeMarkerItem({
 	};
 
 	// A custom tooltip renderer returning null/false is an explicit "no
-	// tooltip for this marker" — e.g. the selected marker's tag renders
-	// elsewhere, anchored to the location info card, instead of following
-	// this marker's live globe position. Falling through to the fallback
-	// label in that case would show a tooltip the caller asked to suppress.
+	// tooltip for this marker" — falling through to the fallback label in
+	// that case would show a tooltip the caller asked to suppress.
 	const tooltipContent = tooltip ? tooltip({ marker, index, visibility }) : marker.label;
 
 	return (
@@ -156,7 +154,19 @@ export default function GlobeMarkerItem({
 				<div
 					ref={tooltipRef}
 					className={cn(
-						'absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-8 flex-col items-center rounded-[9000px] transition-[opacity,filter,box-shadow] duration-200 ease-out select-none',
+						'absolute left-1/2 top-0 inline-flex -translate-x-1/2 flex-col items-center transition-[opacity,filter,box-shadow] duration-200 ease-out select-none',
+						// The selected marker's tooltip (the location info card) is
+						// centered directly on the marker instead of anchored above
+						// it: a focused marker's rest position is always the globe
+						// card's vertical center, so a centered card of any height
+						// fits symmetrically there without clipping against the
+						// card's overflow-hidden edges — anchoring above it (like
+						// the plain pill) would not, since there's rarely 468px of
+						// clearance above the point. -translate-y-1/2 is self-
+						// relative (50% of this element's own height), so it works
+						// regardless of the tooltip's size, unlike a percentage
+						// tied to the zero-height positioning container.
+						isSelected ? '-translate-y-1/2 rounded-[36px]' : '-translate-y-8 rounded-[9000px]',
 						onSelect
 							? 't-avatar pointer-events-auto cursor-pointer hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]'
 							: 'pointer-events-none'

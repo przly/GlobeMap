@@ -147,34 +147,30 @@ export default function App() {
 
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
 		const focused = isFocused(focusOn, marker.location);
+		const detail = focused ? locations.find((loc) => isFocused(marker.location, loc.location)) : undefined;
 
-		const pin = (
-			<div
-				className={cn(
-					'relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color,box-shadow,transform] duration-300 hover:scale-105 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]',
-					focused
-						? 'border-[#42515d] bg-[#041c2c] text-white'
-						: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'
-				)}
-			>
-				<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
-				{marker.label}
-			</div>
-		);
-
-		if (!focused) return pin;
-
-		// The dark pin still marks the marker's exact live position (GlobeMarkerItem
-		// anchors this whole returned block so its *bottom* — the pin, last in this
-		// column — sits 8px above the point). The info card stacks above the pin in
-		// normal flow, so it moves with the globe right along with it.
-		const detail = locations.find((loc) => isFocused(marker.location, loc.location));
-		if (!detail) return pin;
-
+		// Always the same flex-column shape, with the pin always last — only
+		// whether the card sibling exists changes. Keeping the pin's position
+		// in the tree stable (rather than sometimes returning it as the sole
+		// root and sometimes nesting it under a new wrapper) keeps it the same
+		// DOM node across a focus toggle in both directions, which is what
+		// lets its light/dark CSS transition actually animate: React reuses
+		// the node and diffs its class in place instead of unmounting the old
+		// one and mounting a fresh, un-animatable one in the new position.
 		return (
 			<div className="flex flex-col items-center gap-4">
-				<LocationInfoCard location={detail} />
-				{pin}
+				{detail ? <LocationInfoCard location={detail} /> : null}
+				<div
+					className={cn(
+						'relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color,box-shadow,transform] duration-300 hover:scale-105 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]',
+						focused
+							? 'border-[#42515d] bg-[#041c2c] text-white'
+							: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'
+					)}
+				>
+					<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
+					{marker.label}
+				</div>
 			</div>
 		);
 	}

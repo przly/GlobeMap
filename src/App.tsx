@@ -32,15 +32,6 @@ const baseMarkerSize = 0.06;
 // needs roughly 960px+ of width to avoid the two overlapping.
 const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
-// Desktop-only: while a location is focused, the globe pans upward so the
-// focused marker's rest position (dead-center, pre-offset, since focusing
-// rotates the marker to face the camera) lines up with the resting tag
-// anchored above the info card, instead of resting at vertical center.
-// Measured empirically against the tag's actual rendered position — offsetX
-// is left untouched since the tag already sits close to horizontal center
-// plus the existing default offsetX.
-const DESKTOP_FOCUS_OFFSET_Y = 0.24;
-
 // The globe's offsetX is a shader uniform, not a CSS value, so it can't be
 // gated behind a Tailwind breakpoint — it needs to be read from JS instead.
 function useIsDesktop() {
@@ -64,8 +55,7 @@ export default function App() {
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
 	const offsetX = isDesktop ? 1 / 6 : 0;
-	const defaultOffsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
-	const [offsetY, setOffsetY] = useState(defaultOffsetY);
+	const offsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
 	const [scale, setScale] = useState(defaultScale);
 	const [focusOn, setFocusOn] = useState<[number, number] | null>(null);
 	// Mobile has no pinch gesture, so double-tapping the globe toggles
@@ -81,10 +71,7 @@ export default function App() {
 	const [prevIsDesktop, setPrevIsDesktop] = useState(isDesktop);
 	if (isDesktop !== prevIsDesktop) {
 		setPrevIsDesktop(isDesktop);
-		if (!focusOn) {
-			setScale(defaultScale);
-			setOffsetY(defaultOffsetY);
-		}
+		if (!focusOn) setScale(defaultScale);
 	}
 
 	const pointCount = basePointCount;
@@ -92,7 +79,6 @@ export default function App() {
 	const markerSize = baseMarkerSize * (defaultScale / scale);
 
 	const scaleAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
-	const offsetYAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 
 	function animateScaleTo(target: number) {
 		scaleAnimationRef.current?.stop();
@@ -100,15 +86,6 @@ export default function App() {
 			duration: 0.5,
 			ease: 'easeInOut',
 			onUpdate: (latest) => setScale(latest)
-		});
-	}
-
-	function animateOffsetYTo(target: number) {
-		offsetYAnimationRef.current?.stop();
-		offsetYAnimationRef.current = animate(offsetY, target, {
-			duration: 0.5,
-			ease: 'easeInOut',
-			onUpdate: (latest) => setOffsetY(latest)
 		});
 	}
 
@@ -130,7 +107,6 @@ export default function App() {
 		setFocusOn(nextFocus);
 		setIsDoubleTapZoomed(false);
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
-		if (isDesktop) animateOffsetYTo(nextFocus ? DESKTOP_FOCUS_OFFSET_Y : defaultOffsetY);
 	}
 
 	function deselectLocation() {
@@ -138,7 +114,6 @@ export default function App() {
 		setFocusOn(null);
 		setIsDoubleTapZoomed(false);
 		animateScaleTo(defaultScale);
-		if (isDesktop) animateOffsetYTo(defaultOffsetY);
 	}
 
 	// Mobile-only (see the Globe element below): double-tapping empty globe
@@ -152,14 +127,16 @@ export default function App() {
 	}
 
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
-		// The selected marker's tag doesn't render here at all — it's shown
-		// instead as a "resting" tag anchored directly above the location info
-		// card (see the focusedLocation overlay below), rather than following
-		// this marker's live, globe-rotation-dependent screen position.
-		if (isFocused(focusOn, marker.location)) return null;
-
+		const focused = isFocused(focusOn, marker.location);
 		return (
-			<div className="relative flex items-center gap-2.5 rounded-[9000px] border border-[#e6eaed] bg-white px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap text-[#041c2c] shadow-lg transition-colors duration-300 hover:bg-[#f4f6f7]">
+			<div
+				className={cn(
+					'relative flex items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color] duration-300',
+					focused
+						? 'border-[#42515d] bg-[#041c2c] text-white'
+						: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'
+				)}
+			>
 				<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
 				{marker.label}
 			</div>
@@ -267,14 +244,7 @@ export default function App() {
 
 				{focusedLocation ? (
 					<div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 flex justify-center lg:inset-x-auto lg:right-[272.5px] lg:bottom-[12.5px] lg:justify-end">
-						{/* w-fit so this column sizes to its widest child (the card) —
-						    the tag below then centers over the card's own width via
-						    items-center, not the wider positioning wrapper's width. */}
-						<div className="pointer-events-auto flex w-fit flex-col items-center gap-4">
-							<div className="relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap text-white shadow-lg">
-								<span className="size-2 shrink-0 rounded-full bg-[#44d62c]" />
-								{focusedLocation.label}
-							</div>
+						<div className="pointer-events-auto">
 							<LocationInfoCard location={focusedLocation} />
 						</div>
 					</div>

@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
 import { cn } from '../../lib/cn';
 import type { GlobeMarker, GlobeMarkerTooltipRenderer } from './types';
 
@@ -74,72 +74,11 @@ export default function GlobeMarkerItem({
 		filter: `blur(${tooltipBlur}px)`
 	};
 
-	const tooltipRef = useRef<HTMLDivElement>(null);
-	const hoveredRef = useRef(false);
-
-	// Direction-aware easing: the browser uses whatever transition-timing-function
-	// is current at the moment --scale-active changes, so setting it inline right
-	// before each write gives a clean ease-in going into a hovered/pressed state
-	// and a bouncy spring-back easing on the way out — without a second
-	// "is-leaving" class or transition declaration. Scale only, no translate, so
-	// it grows/shrinks in place from `transform-origin: center` (.t-avatar).
-	const applyTransformState = (
-		phase: 'in' | 'out',
-		{ hovered, pressed }: { hovered: boolean; pressed: boolean }
-	) => {
-		const el = tooltipRef.current;
-		if (!el || !onSelect) return;
-
-		const rootStyle = getComputedStyle(document.documentElement);
-		const num = (name: string, fallback: number) => {
-			const value = Number.parseFloat(rootStyle.getPropertyValue(name));
-			return Number.isFinite(value) ? value : fallback;
-		};
-		const ease = (name: string, fallback: string) =>
-			rootStyle.getPropertyValue(name).trim() || fallback;
-
-		const hoverScale = num('--avatar-scale', 1.05);
-		const pressScale = num('--avatar-press-scale', 0.94);
-		const timingFunction =
-			phase === 'out'
-				? ease('--avatar-ease-out', 'cubic-bezier(0.34, 3.85, 0.64, 1)')
-				: ease('--avatar-ease-in', 'cubic-bezier(0.22, 1, 0.36, 1)');
-
-		el.style.transitionTimingFunction = timingFunction;
-		el.style.setProperty('--scale-active', String(pressed ? pressScale : hovered ? hoverScale : 1));
-	};
-
-	const handleMouseEnter = () => {
-		hoveredRef.current = true;
-		applyTransformState('in', { hovered: true, pressed: false });
-	};
-
-	const handleMouseLeave = () => {
-		hoveredRef.current = false;
-		applyTransformState('out', { hovered: false, pressed: false });
-	};
-
-	const handlePointerDown = () => {
-		applyTransformState('in', { hovered: true, pressed: true });
-	};
-
-	const handlePointerUp = () => {
-		applyTransformState('out', { hovered: hoveredRef.current, pressed: false });
-	};
-
 	const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (!onSelect) return;
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
-			if (!event.repeat) applyTransformState('in', { hovered: true, pressed: true });
-			onSelect();
-		}
-	};
-
-	const handleKeyUp = (event: KeyboardEvent<HTMLDivElement>) => {
-		if (!onSelect) return;
-		if (event.key === 'Enter' || event.key === ' ') {
-			applyTransformState('out', { hovered: hoveredRef.current, pressed: false });
+			if (!event.repeat) onSelect();
 		}
 	};
 
@@ -152,7 +91,6 @@ export default function GlobeMarkerItem({
 		<div className="pointer-events-none absolute" style={containerStyle}>
 			{tooltipContent ? (
 				<div
-					ref={tooltipRef}
 					className={cn(
 						// translate-y is self-relative (100% of this element's own
 						// height, not the zero-height positioning container), so
@@ -163,26 +101,23 @@ export default function GlobeMarkerItem({
 						// App.tsx), rather than this component knowing anything
 						// about that content — the pin (last/bottom in that stack)
 						// still ends up exactly at the marker point either way.
-						'absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-[calc(100%+8px)] flex-col items-center transition-[opacity,filter,box-shadow] duration-200 ease-out select-none',
-						// The selected marker's tooltip is the info card + pin
-						// stacked together (see App.tsx) — the hover/press scale
-						// and shadow only belong on the pin itself, not the card,
-						// so this wrapper skips them when selected and the pin
-						// sub-element carries its own hover treatment instead.
-						!onSelect
-							? 'pointer-events-none'
-							: isSelected
-								? 'pointer-events-auto cursor-pointer'
-								: 't-avatar pointer-events-auto cursor-pointer hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]'
+						'absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-[calc(100%+8px)] flex-col items-center transition-[opacity,filter] duration-200 ease-out select-none',
+						// No hover/press scale or shadow on this wrapper — it's
+						// purely a click/keyboard target. Those visuals live on
+						// the tooltip content's own elements instead (see the pin
+						// in App.tsx), because this wrapper's size isn't just the
+						// pin: for the just-deselected marker it still contains
+						// the info card for ~300ms while it blurs out (see
+						// AnimatePresence in App.tsx). isSelected flips the
+						// instant you click, before that exit finishes, so a
+						// wrapper-level hover effect would flash a shadow around
+						// the whole fading card — not just the pin — if the
+						// pointer is still sitting there from the click.
+						onSelect ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'
 					)}
 					style={tooltipStyle}
 					onClick={onSelect}
-					onMouseEnter={isSelected ? undefined : handleMouseEnter}
-					onMouseLeave={isSelected ? undefined : handleMouseLeave}
-					onPointerDown={isSelected ? undefined : handlePointerDown}
-					onPointerUp={isSelected ? undefined : handlePointerUp}
 					onKeyDown={handleKeyDown}
-					onKeyUp={isSelected ? undefined : handleKeyUp}
 					role={onSelect ? 'button' : undefined}
 					tabIndex={onSelect ? 0 : undefined}
 				>

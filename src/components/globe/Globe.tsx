@@ -121,11 +121,12 @@ export default function Globe({
 }: Props) {
 	return (
 		<div className={cn('relative h-full w-full overflow-hidden', className)} {...rest}>
-			{/* No z-index here: an explicit z-index would create a stacking
-			    context that traps the selected marker's pill (see
-			    GlobeMarkerItem) below sibling UI panels like the location
-			    info card, no matter what z-index the pill itself sets. */}
-			<div className="absolute inset-0">
+			{/* z-0 establishes a stacking context that contains the whole globe
+			    (canvas + markers) — no z-index set inside it, however high, can
+			    ever escape above a sibling UI panel like the location info
+			    card, which is exactly what keeps every marker, selected or not,
+			    rendering under the cards instead of over them. */}
+			<div className="absolute inset-0 z-0">
 				<GlobeScene
 					scale={scale}
 					offsetX={offsetX}

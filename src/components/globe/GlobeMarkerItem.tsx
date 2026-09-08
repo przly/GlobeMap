@@ -57,16 +57,16 @@ export default function GlobeMarkerItem({
 	// stacking context — a z-index set deeper (e.g. inside a custom tooltip
 	// renderer) would be trapped inside descendant stacking contexts created by
 	// this component's own `transform`/`filter` styles and could never actually
-	// out-rank a sibling marker. The selected marker's z-index is set well
-	// above the location info card's (z-10 in App.tsx) so its pill tag stays
-	// visible in front of the card rather than being hidden behind it —
-	// this only works because Globe's canvas+marker wrapper no longer forces
-	// its own z-0 stacking context (see Globe.tsx).
+	// out-rank a sibling marker. This only ever ranks the selected marker above
+	// *other markers* — Globe's canvas+marker wrapper has its own z-0 stacking
+	// context (see Globe.tsx), so nothing here can escape above a sibling UI
+	// card regardless of this value; the selected marker stays under the
+	// cards, same as every other marker, by design.
 	const containerStyle: CSSProperties = {
 		left: `${screenX * 100}%`,
 		top: `${screenY * 100}%`,
 		transform: 'translate(-50%, -50%)',
-		zIndex: isSelected ? 20 : undefined
+		zIndex: isSelected ? 1 : undefined
 	};
 
 	const tooltipStyle: CSSProperties = {

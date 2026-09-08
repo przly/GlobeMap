@@ -43,7 +43,7 @@ export default function LocationInfoCard({ location }: Props) {
 			<div className="flex w-full flex-col gap-[24px]">
 				<Stat label="established" value={String(location.establishedYear)} />
 				<Stat label="kWh under management" value={location.kwhUnderManagement} />
-				<Stat label="data center" value={location.hasDataCenter ? 'Yes' : 'No'} />
+				{location.hasDataCenter ? <Stat label="data center" value="Yes" /> : null}
 			</div>
 
 			<a

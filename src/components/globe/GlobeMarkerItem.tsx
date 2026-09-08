@@ -164,18 +164,25 @@ export default function GlobeMarkerItem({
 						// about that content — the pin (last/bottom in that stack)
 						// still ends up exactly at the marker point either way.
 						'absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-[calc(100%+8px)] flex-col items-center transition-[opacity,filter,box-shadow] duration-200 ease-out select-none',
-						onSelect
-							? 't-avatar pointer-events-auto cursor-pointer hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]'
-							: 'pointer-events-none'
+						// The selected marker's tooltip is the info card + pin
+						// stacked together (see App.tsx) — the hover/press scale
+						// and shadow only belong on the pin itself, not the card,
+						// so this wrapper skips them when selected and the pin
+						// sub-element carries its own hover treatment instead.
+						!onSelect
+							? 'pointer-events-none'
+							: isSelected
+								? 'pointer-events-auto cursor-pointer'
+								: 't-avatar pointer-events-auto cursor-pointer hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]'
 					)}
 					style={tooltipStyle}
 					onClick={onSelect}
-					onMouseEnter={handleMouseEnter}
-					onMouseLeave={handleMouseLeave}
-					onPointerDown={handlePointerDown}
-					onPointerUp={handlePointerUp}
+					onMouseEnter={isSelected ? undefined : handleMouseEnter}
+					onMouseLeave={isSelected ? undefined : handleMouseLeave}
+					onPointerDown={isSelected ? undefined : handlePointerDown}
+					onPointerUp={isSelected ? undefined : handlePointerUp}
 					onKeyDown={handleKeyDown}
-					onKeyUp={handleKeyUp}
+					onKeyUp={isSelected ? undefined : handleKeyUp}
 					role={onSelect ? 'button' : undefined}
 					tabIndex={onSelect ? 0 : undefined}
 				>

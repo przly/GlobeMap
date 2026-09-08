@@ -151,7 +151,7 @@ export default function App() {
 		const pin = (
 			<div
 				className={cn(
-					'relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color] duration-300',
+					'relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color,box-shadow,transform] duration-300 hover:scale-105 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]',
 					focused
 						? 'border-[#42515d] bg-[#041c2c] text-white'
 						: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'

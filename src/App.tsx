@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { animate } from 'motion';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
+import LocationInfoCard from './components/LocationInfoCard';
 import { cn } from './lib/cn';
+import { locations, isFocused } from './lib/locations';
 
 const DESKTOP_DEFAULT_SCALE = 1.5;
 const DESKTOP_FOCUS_SCALE = 3;
@@ -29,25 +31,6 @@ const baseMarkerSize = 0.06;
 // block and a 244px locations panel side by side inside the globe card, which
 // needs roughly 960px+ of width to avoid the two overlapping.
 const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
-
-const locations: { label: string; location: [number, number] }[] = [
-	{ label: 'San Francisco', location: [37.7749, -122.4194] },
-	{ label: 'New York', location: [40.7128, -74.006] },
-	{ label: 'London', location: [51.5074, -0.1278] },
-	{ label: 'Berlin', location: [52.52, 13.405] },
-	{ label: 'Tokyo', location: [35.6762, 139.6503] },
-	{ label: 'Singapore', location: [1.3521, 103.8198] },
-	{ label: 'Sydney', location: [-33.8688, 151.2093] },
-	{ label: 'Paris', location: [48.8566, 2.3522] },
-	{ label: 'Madrid', location: [40.4168, -3.7038] },
-	{ label: 'Rome', location: [41.9028, 12.4964] },
-	{ label: 'Amsterdam', location: [52.3676, 4.9041] },
-	{ label: 'Vienna', location: [48.2082, 16.3738] }
-];
-
-function isFocused(focusOn: [number, number] | null, location: [number, number]) {
-	return focusOn !== null && focusOn[0] === location[0] && focusOn[1] === location[1];
-}
 
 // The globe's offsetX is a shader uniform, not a CSS value, so it can't be
 // gated behind a Tailwind breakpoint — it needs to be read from JS instead.
@@ -112,6 +95,12 @@ export default function App() {
 		color: '#041c2c',
 		size: markerSize
 	}));
+
+	// The info card is sized independently of any marker's on-screen position
+	// (it's much taller than the globe card has clearance for at most marker
+	// positions), so it renders as a fixed overlay panel rather than anchored
+	// to the marker like the pill tooltip.
+	const focusedLocation = focusOn ? locations.find((loc) => isFocused(focusOn, loc.location)) : undefined;
 
 	function selectLocation(location: [number, number]) {
 		const nextFocus = isFocused(focusOn, location) ? null : location;
@@ -252,6 +241,14 @@ export default function App() {
 				<div className="absolute right-[12.5px] bottom-[12.5px] hidden w-[244px] flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px] lg:flex">
 					{renderLocationRows()}
 				</div>
+
+				{focusedLocation ? (
+					<div className="pointer-events-none absolute inset-x-4 bottom-4 z-10 flex justify-center lg:inset-x-auto lg:right-[272.5px] lg:bottom-[12.5px] lg:justify-end">
+						<div className="pointer-events-auto">
+							<LocationInfoCard location={focusedLocation} />
+						</div>
+					</div>
+				) : null}
 
 				<div className="pointer-events-none absolute top-8 left-8 flex w-[calc(100%-64px)] flex-col items-start gap-4 lg:hidden">
 					<p className="font-['Inter'] text-[36px] leading-none font-medium tracking-[-0.72px] text-[#041c2c]">

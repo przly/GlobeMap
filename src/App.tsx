@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { animate } from 'motion';
+import { AnimatePresence } from 'motion/react';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
 import LocationInfoCard from './components/LocationInfoCard';
 import { cn } from './lib/cn';
@@ -159,7 +160,12 @@ export default function App() {
 		// one and mounting a fresh, un-animatable one in the new position.
 		return (
 			<div className="flex flex-col items-center gap-4">
-				{detail ? <LocationInfoCard location={detail} /> : null}
+				{/* mode="wait" so switching directly between two focused locations
+				    fully exits the old card before the new one enters, instead of
+				    both briefly sharing this flex column's layout space. */}
+				<AnimatePresence mode="wait">
+					{detail ? <LocationInfoCard key={detail.label} location={detail} /> : null}
+				</AnimatePresence>
 				<div
 					className={cn(
 						'relative flex shrink-0 items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color,box-shadow,transform] duration-300 hover:scale-105 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]',

@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import type { LocationDetail } from '../lib/locations';
 
 interface Props {
@@ -22,7 +23,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function LocationInfoCard({ location }: Props) {
 	return (
-		<div className="flex w-[min(361px,calc(100vw-2rem))] flex-col gap-[24px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl transition-[opacity,filter] duration-300 ease-out starting:opacity-0 starting:blur-lg">
+		<motion.div
+			initial={{ opacity: 0, filter: 'blur(16px)' }}
+			animate={{ opacity: 1, filter: 'blur(0px)' }}
+			exit={{ opacity: 0, filter: 'blur(16px)' }}
+			transition={{ duration: 0.3, ease: 'easeOut' }}
+			className="flex w-[min(361px,calc(100vw-2rem))] flex-col gap-[24px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
+		>
 			<div className="flex w-full flex-col items-start gap-[24px]">
 				<span
 					className="flex size-[24px] shrink-0 items-center justify-center rounded-[4px] border-[0.5px] border-black/10 text-[14px] leading-none"
@@ -58,6 +65,6 @@ export default function LocationInfoCard({ location }: Props) {
 					→
 				</span>
 			</a>
-		</div>
+		</motion.div>
 	);
 }

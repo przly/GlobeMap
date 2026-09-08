@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { animate } from 'motion';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
 import { cn } from './lib/cn';
@@ -154,6 +154,22 @@ export default function App() {
 		);
 	}
 
+	// Same press-down convention as GlobeMarkerItem's tooltip: respond on
+	// pointer-down (not release) with an instant scale-in. Unlike the tooltip,
+	// the release isn't momentum-driven, so it eases back out critically
+	// damped (no overshoot) rather than using the bouncier easing token.
+	function pressRow(event: PointerEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) {
+		const el = event.currentTarget;
+		el.style.transitionTimingFunction = 'var(--avatar-ease-in)';
+		el.style.setProperty('--scale-active', 'var(--avatar-press-scale)');
+	}
+
+	function releaseRow(event: PointerEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) {
+		const el = event.currentTarget;
+		el.style.transitionTimingFunction = 'var(--avatar-ease-in)';
+		el.style.removeProperty('--scale-active');
+	}
+
 	function renderLocationRows() {
 		return locations.map((loc) => {
 			const focused = isFocused(focusOn, loc.location);
@@ -162,16 +178,25 @@ export default function App() {
 					key={loc.label}
 					type="button"
 					onClick={() => selectLocation(loc.location)}
-					className="group relative min-h-[26px] w-full shrink-0 overflow-hidden rounded-full"
+					onPointerDown={pressRow}
+					onPointerUp={releaseRow}
+					onPointerLeave={releaseRow}
+					onKeyDown={(event) => {
+						if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) pressRow(event);
+					}}
+					onKeyUp={(event) => {
+						if (event.key === 'Enter' || event.key === ' ') releaseRow(event);
+					}}
+					className="t-avatar group relative w-full shrink-0 overflow-hidden rounded-full"
 				>
 					{focused ? (
-						<span className="absolute inset-0 rounded-full bg-[#44d62c]" />
+						<span className="absolute inset-0 rounded-full bg-[#041c2c]" />
 					) : (
 						<span className="absolute inset-0 -translate-x-full rounded-full bg-[#f4f6f7] transition-transform duration-200 ease-out group-hover:translate-x-0" />
 					)}
 					<span
-						className={`relative block p-[12px] text-left font-['Inter'] text-[14px] leading-none font-normal tracking-[-0.28px] ${
-							focused ? 'text-white' : 'text-[#7c868e]'
+						className={`relative block px-[20px] py-[12px] text-left font-['Inter'] text-[14px] leading-[1.5] font-normal transition-colors duration-200 ease-out ${
+							focused ? 'text-white' : 'text-[#7c868e] group-hover:text-[#041c2c]'
 						}`}
 					>
 						{loc.label}
@@ -183,7 +208,7 @@ export default function App() {
 
 	return (
 		<div className="flex min-h-screen w-full flex-col items-center gap-4 bg-white px-4 py-6 lg:justify-center lg:px-6">
-			<main className="relative flex aspect-[361/674] h-auto w-full shrink-0 items-center justify-center overflow-hidden rounded-[16px] border-[0.5px] border-[#cbd1d6] bg-white lg:aspect-auto lg:h-[700px] lg:rounded-[24px]">
+			<main className="relative flex aspect-[361/674] h-auto w-full shrink-0 items-center justify-center overflow-hidden rounded-[48px] border-[0.5px] border-[#cbd1d6] bg-white lg:aspect-auto lg:h-[700px]">
 				<Globe
 					className={cn(
 						'absolute top-0 left-[-15%] h-full w-[130%]',
@@ -224,14 +249,8 @@ export default function App() {
 					</p>
 				</div>
 
-				<div className="absolute right-[12.5px] bottom-[12.5px] hidden h-[502px] w-[244px] flex-col overflow-hidden rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white lg:flex">
-					<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-['Geist_Mono'] text-[12px] leading-none font-normal tracking-[-0.24px] text-[#7c868e] uppercase">
-						locations
-					</span>
-					<div className="mx-[11.5px] shrink-0 border-t-[0.5px] border-[#cbd1d6]" />
-					<div className="no-scrollbar flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto px-[11.5px] pt-[8px] pb-[11.5px]">
-						{renderLocationRows()}
-					</div>
+				<div className="absolute right-[12.5px] bottom-[12.5px] hidden w-[244px] flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px] lg:flex">
+					{renderLocationRows()}
 				</div>
 
 				<div className="pointer-events-none absolute top-8 left-8 flex w-[calc(100%-64px)] flex-col items-start gap-4 lg:hidden">

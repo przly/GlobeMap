@@ -32,6 +32,15 @@ const baseMarkerSize = 0.06;
 // needs roughly 960px+ of width to avoid the two overlapping.
 const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
+// Desktop-only: while a location is focused, the globe pans upward so the
+// focused marker's rest position (dead-center, pre-offset, since focusing
+// rotates the marker to face the camera) lines up with the resting tag
+// anchored above the info card, instead of resting at vertical center.
+// Measured empirically against the tag's actual rendered position — offsetX
+// is left untouched since the tag already sits close to horizontal center
+// plus the existing default offsetX.
+const DESKTOP_FOCUS_OFFSET_Y = 0.24;
+
 // The globe's offsetX is a shader uniform, not a CSS value, so it can't be
 // gated behind a Tailwind breakpoint — it needs to be read from JS instead.
 function useIsDesktop() {
@@ -55,7 +64,8 @@ export default function App() {
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
 	const offsetX = isDesktop ? 1 / 6 : 0;
-	const offsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
+	const defaultOffsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
+	const [offsetY, setOffsetY] = useState(defaultOffsetY);
 	const [scale, setScale] = useState(defaultScale);
 	const [focusOn, setFocusOn] = useState<[number, number] | null>(null);
 	// Mobile has no pinch gesture, so double-tapping the globe toggles
@@ -71,7 +81,10 @@ export default function App() {
 	const [prevIsDesktop, setPrevIsDesktop] = useState(isDesktop);
 	if (isDesktop !== prevIsDesktop) {
 		setPrevIsDesktop(isDesktop);
-		if (!focusOn) setScale(defaultScale);
+		if (!focusOn) {
+			setScale(defaultScale);
+			setOffsetY(defaultOffsetY);
+		}
 	}
 
 	const pointCount = basePointCount;
@@ -79,6 +92,7 @@ export default function App() {
 	const markerSize = baseMarkerSize * (defaultScale / scale);
 
 	const scaleAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+	const offsetYAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 
 	function animateScaleTo(target: number) {
 		scaleAnimationRef.current?.stop();
@@ -86,6 +100,15 @@ export default function App() {
 			duration: 0.5,
 			ease: 'easeInOut',
 			onUpdate: (latest) => setScale(latest)
+		});
+	}
+
+	function animateOffsetYTo(target: number) {
+		offsetYAnimationRef.current?.stop();
+		offsetYAnimationRef.current = animate(offsetY, target, {
+			duration: 0.5,
+			ease: 'easeInOut',
+			onUpdate: (latest) => setOffsetY(latest)
 		});
 	}
 
@@ -107,6 +130,7 @@ export default function App() {
 		setFocusOn(nextFocus);
 		setIsDoubleTapZoomed(false);
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
+		if (isDesktop) animateOffsetYTo(nextFocus ? DESKTOP_FOCUS_OFFSET_Y : defaultOffsetY);
 	}
 
 	function deselectLocation() {
@@ -114,6 +138,7 @@ export default function App() {
 		setFocusOn(null);
 		setIsDoubleTapZoomed(false);
 		animateScaleTo(defaultScale);
+		if (isDesktop) animateOffsetYTo(defaultOffsetY);
 	}
 
 	// Mobile-only (see the Globe element below): double-tapping empty globe

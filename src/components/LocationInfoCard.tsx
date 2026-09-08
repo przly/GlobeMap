@@ -28,6 +28,14 @@ export default function LocationInfoCard({ location }: Props) {
 			animate={{ opacity: 1, filter: 'blur(0px)' }}
 			exit={{ opacity: 0, filter: 'blur(16px)' }}
 			transition={{ duration: 0.3, ease: 'easeOut' }}
+			// The pin and card share one click-to-toggle handler up on
+			// GlobeMarkerItem's wrapper (so clicking the pin opens/closes the
+			// tooltip). Stopping propagation here means a click anywhere on the
+			// card itself — other than the "Visit website" link, which already
+			// stops its own propagation — never reaches that handler, so it does
+			// nothing instead of closing the tooltip. Only the pin or a genuine
+			// outside click (the globe background) closes it.
+			onClick={(event) => event.stopPropagation()}
 			className="flex w-[min(361px,calc(100vw-2rem))] flex-col gap-[24px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
 		>
 			<div className="flex w-full flex-col items-start gap-[24px]">
@@ -57,7 +65,6 @@ export default function LocationInfoCard({ location }: Props) {
 				href={location.websiteUrl}
 				target="_blank"
 				rel="noopener noreferrer"
-				onClick={(event) => event.stopPropagation()}
 				className="inline-flex shrink-0 items-center gap-[6px] self-end rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224]"
 			>
 				Visit website

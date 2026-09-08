@@ -9,7 +9,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 		<div className="flex w-full flex-col gap-[16px]">
 			<div className="h-px w-full shrink-0 bg-[#e6eaed]" />
 			<div className="flex w-full flex-col gap-[8px]">
-				<p className="font-mono text-[10px] leading-none font-semibold tracking-[-0.2px] text-[#7c868e] uppercase">
+				<p className="font-mono text-[10px] leading-none font-medium tracking-[-0.2px] text-[#7c868e] uppercase">
 					{label}
 				</p>
 				<p className="font-['Inter'] text-[24px] leading-[1.2] font-medium tracking-[-0.48px] text-[#041c2c]">

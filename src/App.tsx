@@ -39,7 +39,7 @@ const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 // info card stacked on top of it (see renderMarkerTooltip) without clipping
 // against the card's overflow-hidden edge. Measured empirically against the
 // pin+card group's actual rendered height.
-const DESKTOP_FOCUS_OFFSET_Y = -0.26;
+const DESKTOP_FOCUS_OFFSET_Y = -0.36;
 
 // The globe's offsetX is a shader uniform, not a CSS value, so it can't be
 // gated behind a Tailwind breakpoint — it needs to be read from JS instead.

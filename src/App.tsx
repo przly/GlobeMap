@@ -224,7 +224,7 @@ export default function App() {
 
 				<div className="absolute top-[47.5px] left-[47.5px] hidden items-center gap-[48px] lg:flex">
 					<span className="size-[10px] shrink-0 rounded-full bg-[#44d62c]" />
-					<span className="font-['Geist_Mono'] text-[12px] leading-[1.05] font-normal text-[#7c868e] uppercase">
+					<span className="font-mono text-[12px] leading-[1.05] font-normal text-[#7c868e] uppercase">
 						locations
 					</span>
 				</div>
@@ -271,7 +271,7 @@ export default function App() {
 			</main>
 
 			<div className="flex w-full flex-col rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden">
-				<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-['Geist_Mono'] text-[12px] leading-none font-normal tracking-[-0.24px] text-[#7c868e] uppercase">
+				<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-mono text-[12px] leading-none font-normal tracking-[-0.24px] text-[#7c868e] uppercase">
 					locations
 				</span>
 				<div className="mx-[11.5px] shrink-0 border-t-[0.5px] border-[#cbd1d6]" />

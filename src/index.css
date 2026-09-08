@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+/* Google Fonts only ever serves Geist Mono at a single (Regular) weight —
+   every heavier `wght` request silently resolves to the same file, so
+   font-medium/font-semibold text rendered no bolder than normal. This is
+   the real variable font, self-hosted, with a working weight axis. */
+@import '@fontsource-variable/geist-mono';
 
 /* motion-core:tokens:start */
 @variant dark (&:where(.dark, .dark *));
@@ -49,6 +54,8 @@
 }
 
 @theme {
+	--font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
 	--color-fixed-light: var(--fixed-light);
 	--color-fixed-dark: var(--fixed-dark);
 	--color-background-inset: var(--background-inset);

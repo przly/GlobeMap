@@ -121,7 +121,11 @@ export default function Globe({
 }: Props) {
 	return (
 		<div className={cn('relative h-full w-full overflow-hidden', className)} {...rest}>
-			<div className="absolute inset-0 z-0">
+			{/* No z-index here: an explicit z-index would create a stacking
+			    context that traps the selected marker's pill (see
+			    GlobeMarkerItem) below sibling UI panels like the location
+			    info card, no matter what z-index the pill itself sets. */}
+			<div className="absolute inset-0">
 				<GlobeScene
 					scale={scale}
 					offsetX={offsetX}

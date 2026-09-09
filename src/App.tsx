@@ -551,26 +551,46 @@ export default function App() {
 							<div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
 								{renderLocationRows()}
 							</div>
-							<button
-								type="button"
-								onClick={closeMobileLocations}
-								className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#e6eaed] bg-[#f4f6f7] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#e6eaed]"
-							>
-								<svg
-									width="4"
-									height="6"
-									viewBox="0 0 4 6"
-									fill="none"
+							{/* Negative x/bottom margins cancel the pane's own 36px
+							    padding on those sides, so the gradient below (inset-0
+							    within this footer) bleeds all the way to the card's true
+							    edges instead of stopping short at the padded content
+							    area — the matching px/pb restores the button's own
+							    position exactly where it was. Top gets no such
+							    treatment: the footer's top edge is exactly where the
+							    scrollable list above it ends, which is where the
+							    gradient should start fading in from, per the brief. */}
+							<div className="relative -mx-[36px] -mb-[36px] shrink-0 px-[36px] pb-[36px]">
+								{/* z-index below the button (a plain, non-positioned
+								    element) so it paints as a backdrop behind it rather
+								    than over it — an absolutely positioned layer with no
+								    z-index would otherwise paint above in-flow content by
+								    default. */}
+								<div
 									aria-hidden="true"
-									className="shrink-0"
+									className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-black to-transparent"
+								/>
+								<button
+									type="button"
+									onClick={closeMobileLocations}
+									className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#e6eaed] bg-[#f4f6f7] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#e6eaed]"
 								>
-									<path
-										d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
-										fill="#041C2C"
-									/>
-								</svg>
-								Back to map
-							</button>
+									<svg
+										width="4"
+										height="6"
+										viewBox="0 0 4 6"
+										fill="none"
+										aria-hidden="true"
+										className="shrink-0"
+									>
+										<path
+											d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
+											fill="#041C2C"
+										/>
+									</svg>
+									Back to map
+								</button>
+							</div>
 						</motion.div>
 					) : mobileStep === 'card' && focusedLocation ? (
 						<motion.div

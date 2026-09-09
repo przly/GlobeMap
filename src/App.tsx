@@ -543,6 +543,23 @@ export default function App() {
 							transition={MOBILE_PANE_TRANSITION}
 							className="absolute inset-0 flex w-full flex-col gap-[16px] p-[36px] lg:hidden"
 						>
+							{/* Mirrors the footer gradient below: a negative x/top
+							    margin cancels the pane's own 36px top/side padding so
+							    this bleeds to the card's true top edge and full width,
+							    with its own height coming purely from pt-[36px] (empty
+							    otherwise) — i.e. it spans exactly from the card's top
+							    edge down to where the scrollable list starts, same as
+							    the footer does from the bottom. z-0 for the same reason
+							    as the footer's: without an explicit stacking context
+							    here, -z-10 would resolve against whatever ancestor
+							    happens to be one at the time, which isn't stable across
+							    the pane's own enter/exit animation. */}
+							<div className="relative z-0 -mx-[36px] -mt-[36px] shrink-0 pt-[36px]">
+								<div
+									aria-hidden="true"
+									className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-black to-transparent"
+								/>
+							</div>
 							{/* min-h-0 overrides the flex item's default min-height:
 							    auto, which would otherwise let it grow past the pane's
 							    bottom edge (rather than scroll) since its content can

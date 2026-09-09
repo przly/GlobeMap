@@ -33,27 +33,20 @@ const baseMarkerSize = 0.06;
 // needs roughly 960px+ of width to avoid the two overlapping.
 const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
-// Mobile-only: the swap shell's fixed height, matching the locations list's
-// own natural height exactly (row height 45px = py-[12px]*2 + a 14px/1.5
-// line's 21px line-height; ROW_GAP is the list's gap-[2px]; PADDING is its
-// p-[11.5px]) so the info card's content can justify-between to fill it
-// (see LocationInfoCard) instead of the two ending up different heights.
-// Computed from locations.length rather than hardcoded so it stays correct
-// if the location count changes.
-const MOBILE_LIST_ROW_HEIGHT = 45;
-const MOBILE_LIST_ROW_GAP = 2;
-const MOBILE_LIST_PADDING = 11.5;
-const MOBILE_LIST_HEIGHT =
-	locations.length * MOBILE_LIST_ROW_HEIGHT +
-	(locations.length - 1) * MOBILE_LIST_ROW_GAP +
-	MOBILE_LIST_PADDING * 2;
-
 // Mobile-only: the list<->card content swap uses AnimatePresence's default
 // sync mode (enter and exit run together, not one after the other), so
 // there's no gap to delay the enter for — kept as an explicit named
 // constant rather than just omitting `delay` so that intent reads clearly
 // at the call site.
 const CONTENT_SWAP_ENTER_DELAY = 0;
+
+// Mobile-only: the globe/title pane and the locations pane are two full-size
+// siblings stacked with absolute inset-0 inside the (overflow-hidden) globe
+// card, pushed off to either side with a 100% x offset when inactive. Both
+// panes always stay mounted — only their x offset (and, under reduced
+// motion, opacity) changes — so the globe canvas is never torn down/rebuilt
+// by the swap.
+const MOBILE_PANE_TRANSITION = { duration: 0.35, ease: 'easeInOut' } as const;
 
 // Desktop-only: while a location is focused, the globe pans down so the
 // focused marker's rest position (dead-center, pre-offset, since focusing
@@ -109,28 +102,20 @@ function usePrefersReducedMotion() {
 export default function App() {
 	const isDesktop = useIsDesktop();
 	const prefersReducedMotion = usePrefersReducedMotion();
-	// Mobile-only: the locations list renders in its own shell below the
-	// globe card (see the bottom of the JSX below) rather than inside it, and
-	// starts unmounted — the "Explore locations" button reveals it, sliding
-	// in with the same enter transition used for the list<->card swap inside
-	// it (see the shell's motion.div below) so opening it reads as the same
-	// kind of navigation as focusing a location.
+	// Mobile-only: which of the two panes inside the globe card is showing —
+	// see MOBILE_PANE_TRANSITION above. "Explore locations" opens the
+	// locations pane; its own Back control (or picking nothing) closes it
+	// again, sliding the globe/title pane back into view.
 	const [isMobileLocationsOpen, setIsMobileLocationsOpen] = useState(false);
-	const mobileLocationsRef = useRef<HTMLDivElement>(null);
 
 	function openMobileLocations() {
 		setIsMobileLocationsOpen(true);
 	}
 
-	// Scrolls the shell into view once it mounts, since the button that
-	// opens it can be further down the page than the shell's landing spot.
-	useEffect(() => {
-		if (!isMobileLocationsOpen) return;
-		mobileLocationsRef.current?.scrollIntoView({
-			behavior: prefersReducedMotion ? 'auto' : 'smooth',
-			block: 'start'
-		});
-	}, [isMobileLocationsOpen, prefersReducedMotion]);
+	function closeMobileLocations() {
+		deselectLocation();
+		setIsMobileLocationsOpen(false);
+	}
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
 	const defaultOffsetX = isDesktop ? 1 / 6 : 0;
@@ -157,6 +142,11 @@ export default function App() {
 			setOffsetX(defaultOffsetX);
 			setOffsetY(defaultOffsetY);
 		}
+		// A resize onto the desktop breakpoint while the mobile locations pane
+		// was open would otherwise leave the globe pane's -100% x offset in
+		// place (see globePaneOffset below), hiding the globe entirely on
+		// desktop, since that state isn't itself breakpoint-gated.
+		if (isDesktop) setIsMobileLocationsOpen(false);
 	}
 
 	const pointCount = basePointCount;
@@ -247,7 +237,9 @@ export default function App() {
 		// pin-anchored card to reliably avoid clipping. The pin itself still
 		// renders here either way.
 		const detail =
-			focused && isDesktop ? locations.find((loc) => isFocused(marker.location, loc.location)) : undefined;
+			focused && isDesktop
+				? locations.find((loc) => isFocused(marker.location, loc.location))
+				: undefined;
 
 		// Always the same flex-column shape, with the pin always last — only
 		// whether the card sibling exists changes. Keeping the pin's position
@@ -275,7 +267,7 @@ export default function App() {
 				</AnimatePresence>
 				<div
 					className={cn(
-						'relative flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color,box-shadow,transform] duration-300 hover:scale-105 active:scale-95 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)]',
+						'relative flex shrink-0 cursor-pointer items-center gap-2.5 rounded-[9000px] border px-2.5 py-2 text-xs leading-none font-medium whitespace-nowrap shadow-lg transition-[background-color,color,border-color,box-shadow,transform] duration-300 hover:scale-105 hover:shadow-[0_6px_16px_-4px_rgba(0,0,0,0.18)] active:scale-95',
 						focused
 							? 'border-[#42515d] bg-[#041c2c] text-white'
 							: 'border-[#e6eaed] bg-white text-[#041c2c] hover:bg-[#f4f6f7]'
@@ -334,7 +326,9 @@ export default function App() {
 					)}
 					<span
 						className={`relative block px-[20px] py-[12px] text-left font-['Inter'] text-[14px] leading-[1.5] font-normal transition-colors duration-200 ease-out ${
-							focused ? 'text-white' : 'text-[#7c868e] group-hover:text-[#041c2c] group-active:text-[#041c2c]'
+							focused
+								? 'text-white'
+								: 'text-[#7c868e] group-hover:text-[#041c2c] group-active:text-[#041c2c]'
 						}`}
 					>
 						{loc.label}
@@ -344,144 +338,218 @@ export default function App() {
 		});
 	}
 
+	// Mobile-only: whichever pane is inactive is pushed fully off to one side
+	// (100% of the card's own width, via the parent's overflow-hidden) rather
+	// than a small nudge — this is a full page-style swap of the whole card's
+	// content, not the smaller in-place crossfade the list<->card swap below
+	// still uses. Both stay mounted throughout (including on desktop, where
+	// the offset is always 0 since only the mobile-only "Explore locations"
+	// button can open it) so the globe canvas is never rebuilt.
+	const globePaneOffset = isMobileLocationsOpen ? '-100%' : '0%';
+	const locationsPaneOffset = isMobileLocationsOpen ? '0%' : '100%';
+
 	return (
 		<div className="flex min-h-screen w-full flex-col items-center gap-4 bg-white px-4 py-6 lg:justify-center lg:px-6">
 			<main className="relative flex aspect-[361/674] h-auto w-full shrink-0 items-center justify-center overflow-hidden rounded-[48px] border-[0.5px] border-[#cbd1d6] bg-white lg:aspect-auto lg:h-[700px]">
-				<Globe
+				<motion.div
 					className={cn(
-						'absolute top-0 left-[-15%] h-full w-[130%]',
-						'lg:inset-0 lg:top-auto lg:left-auto lg:h-full lg:w-full'
+						'absolute inset-0',
+						isMobileLocationsOpen && 'pointer-events-none lg:pointer-events-auto'
 					)}
-					scale={scale}
-					offsetX={offsetX}
-					offsetY={offsetY}
-					rotation={5}
-					axialTilt={-23}
-					pointCount={pointCount}
-					pointSize={pointSize}
-					landPointColor="#44d62c"
-					fresnelConfig={{ color: '#E6EAED', rimColor: '#44D62C' }}
-					markers={markers}
-					markerTooltip={renderMarkerTooltip}
-					onMarkerClick={(marker) => selectLocation(marker.location)}
-					onBackgroundClick={deselectLocation}
-					onDoubleTap={isDesktop ? undefined : toggleDoubleTapZoom}
-					focusOn={focusOn}
-					autoRotate={!focusOn}
-					lockedPolarAngle={isDesktop ? !focusOn : false}
-				/>
+					animate={
+						prefersReducedMotion
+							? { opacity: isMobileLocationsOpen ? 0 : 1 }
+							: { x: globePaneOffset }
+					}
+					transition={MOBILE_PANE_TRANSITION}
+					aria-hidden={isMobileLocationsOpen}
+				>
+					<Globe
+						className={cn(
+							'absolute top-0 left-[-15%] h-full w-[130%]',
+							'lg:inset-0 lg:top-auto lg:left-auto lg:h-full lg:w-full'
+						)}
+						scale={scale}
+						offsetX={offsetX}
+						offsetY={offsetY}
+						rotation={5}
+						axialTilt={-23}
+						pointCount={pointCount}
+						pointSize={pointSize}
+						landPointColor="#44d62c"
+						fresnelConfig={{ color: '#E6EAED', rimColor: '#44D62C' }}
+						markers={markers}
+						markerTooltip={renderMarkerTooltip}
+						onMarkerClick={(marker) => selectLocation(marker.location)}
+						onBackgroundClick={deselectLocation}
+						onDoubleTap={isDesktop ? undefined : toggleDoubleTapZoom}
+						focusOn={focusOn}
+						autoRotate={!focusOn}
+						lockedPolarAngle={isDesktop ? !focusOn : false}
+					/>
 
-				<div className="absolute top-[47.5px] left-[47.5px] hidden items-center gap-[48px] lg:flex">
-					<span className="size-[10px] shrink-0 rounded-full bg-[#44d62c]" />
-					<span className="font-mono text-[12px] leading-[1.05] font-medium text-[#7c868e] uppercase">
-						locations
-					</span>
-				</div>
+					<div className="absolute top-[47.5px] left-[47.5px] hidden items-center gap-[48px] lg:flex">
+						<span className="size-[10px] shrink-0 rounded-full bg-[#44d62c]" />
+						<span className="font-mono text-[12px] leading-[1.05] font-medium text-[#7c868e] uppercase">
+							locations
+						</span>
+					</div>
 
-				<div className="absolute bottom-[47.5px] left-[47.5px] hidden w-[433px] flex-col gap-[16px] lg:flex">
-					<p className="font-['Inter'] text-[48px] leading-[1.05] font-medium tracking-[-1.44px] text-[#041c2c]">
-						Built across Europe, <span className="text-[#7c868e]">with local partners.</span>
-					</p>
-					<p className="font-['Inter'] text-[16px] leading-[1.5] font-normal text-[#7c868e]">
-						See where NGEN operates and find relevant projects, offices and partners near you.
-					</p>
-				</div>
+					<div className="absolute bottom-[47.5px] left-[47.5px] hidden w-[433px] flex-col gap-[16px] lg:flex">
+						<p className="font-['Inter'] text-[48px] leading-[1.05] font-medium tracking-[-1.44px] text-[#041c2c]">
+							Built across Europe, <span className="text-[#7c868e]">with local partners.</span>
+						</p>
+						<p className="font-['Inter'] text-[16px] leading-[1.5] font-normal text-[#7c868e]">
+							See where NGEN operates and find relevant projects, offices and partners near you.
+						</p>
+					</div>
 
-				<div className="absolute right-[12.5px] bottom-[12.5px] hidden w-[244px] flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px] lg:flex">
-					{renderLocationRows()}
-				</div>
+					<div className="absolute right-[12.5px] bottom-[12.5px] hidden w-[244px] flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px] lg:flex">
+						{renderLocationRows()}
+					</div>
 
-				<div className="pointer-events-none absolute top-8 left-8 flex w-[calc(100%-64px)] flex-col items-start gap-4 lg:hidden">
-					<p className="font-['Inter'] text-[36px] leading-none font-medium tracking-[-0.72px] text-[#041c2c]">
-						<span className="leading-none">Built across Europe, </span>
-						<span className="leading-none text-[#7c868e]">with local partners.</span>
-					</p>
-					<p className="font-['Inter'] text-[16px] leading-[1.5] font-medium text-[#7c868e]">
-						See where NGEN operates and find relevant projects, offices and partners near you.
-					</p>
+					<div className="pointer-events-none absolute top-8 left-8 flex w-[calc(100%-64px)] flex-col items-start gap-4 lg:hidden">
+						<p className="font-['Inter'] text-[36px] leading-none font-medium tracking-[-0.72px] text-[#041c2c]">
+							<span className="leading-none">Built across Europe, </span>
+							<span className="leading-none text-[#7c868e]">with local partners.</span>
+						</p>
+						<p className="font-['Inter'] text-[16px] leading-[1.5] font-medium text-[#7c868e]">
+							See where NGEN operates and find relevant projects, offices and partners near you.
+						</p>
+						<button
+							type="button"
+							className="pointer-events-auto inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-4 py-3 text-sm font-normal text-white"
+						>
+							About NGEN
+							<span aria-hidden="true" className="text-sm leading-none">
+								→
+							</span>
+						</button>
+					</div>
+
 					<button
 						type="button"
-						className="pointer-events-auto inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-4 py-3 text-sm font-normal text-white"
+						onClick={openMobileLocations}
+						className="pointer-events-auto absolute right-8 bottom-8 inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-4 py-3 text-sm font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224] lg:hidden"
 					>
-						About NGEN
+						Explore locations
 						<span aria-hidden="true" className="text-sm leading-none">
 							→
 						</span>
 					</button>
-				</div>
-
-				<button
-					type="button"
-					onClick={openMobileLocations}
-					className="absolute right-8 bottom-8 inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-4 py-3 text-sm font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224] lg:hidden"
-				>
-					Explore locations
-					<span aria-hidden="true" className="text-sm leading-none">
-						→
-					</span>
-				</button>
-			</main>
-
-			{/* Unmounted until "Explore locations" is clicked, then slides in
-			    with the exact same enter transition the card uses below when a
-			    location is focused (x:32/opacity/blur → 0), so revealing the
-			    list reads as the same navigation as focusing a location does.
-			    No exit here — once opened it stays mounted; only its own
-			    content (list vs. card) swaps after that. */}
-			{isMobileLocationsOpen ? (
-				<motion.div
-					ref={mobileLocationsRef}
-					initial={prefersReducedMotion ? { opacity: 0 } : { x: 32, opacity: 0, filter: 'blur(4px)' }}
-					animate={prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' }}
-					transition={{ duration: 0.14, ease: 'easeInOut', delay: CONTENT_SWAP_ENTER_DELAY }}
-					className="relative w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden"
-					style={{ height: MOBILE_LIST_HEIGHT }}
-				>
-					{/* Default sync AnimatePresence mode (no mode="wait"), so the
-					    outgoing and incoming content fully overlap instead of one
-					    waiting for the other to finish — CONTENT_SWAP_ENTER_DELAY is
-					    0, i.e. the enter animation starts the instant the exit does.
-					    Both are absolutely positioned within this relative, fixed-
-					    height shell so they can overlap without a layout jump. A
-					    small ±32px nudge + blur crossfade reads as a content swap
-					    inside the shell, not two full-width panels sliding past each
-					    other. Direction still mirrors: card enters from/exits back
-					    to the right, list enters from/exits back to the left.
-					    initial={false} means the list doesn't animate a second time
-					    right after the shell itself just slid in above.
-					    prefers-reduced-motion drops the slide and blur, keeping only
-					    the opacity crossfade. */}
-					<AnimatePresence initial={false}>
-						{focusedLocation ? (
-							<motion.div
-								key="card"
-								initial={
-									prefersReducedMotion ? { opacity: 0 } : { x: 32, opacity: 0, filter: 'blur(4px)' }
-								}
-								animate={prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' }}
-								exit={prefersReducedMotion ? { opacity: 0 } : { x: 32, opacity: 0, filter: 'blur(4px)' }}
-								transition={{ duration: 0.14, ease: 'easeInOut', delay: CONTENT_SWAP_ENTER_DELAY }}
-								className="absolute inset-0"
-							>
-								<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
-							</motion.div>
-						) : (
-							<motion.div
-								key="list"
-								initial={
-									prefersReducedMotion ? { opacity: 0 } : { x: -32, opacity: 0, filter: 'blur(4px)' }
-								}
-								animate={prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' }}
-								exit={prefersReducedMotion ? { opacity: 0 } : { x: -32, opacity: 0, filter: 'blur(4px)' }}
-								transition={{ duration: 0.14, ease: 'easeInOut', delay: CONTENT_SWAP_ENTER_DELAY }}
-								className="absolute inset-0 flex w-full flex-col gap-[2px] p-[11.5px]"
-							>
-								{renderLocationRows()}
-							</motion.div>
-						)}
-					</AnimatePresence>
 				</motion.div>
-			) : null}
+
+				{/* Mobile-only second pane, pushed off to the right until
+				    "Explore locations" is tapped, then slides in to fully
+				    replace the pane above (see globePaneOffset/locationsPaneOffset).
+				    The list<->card swap inside it is untouched — same small
+				    ±32px/blur crossfade as before, just now filling the whole
+				    card instead of a shorter shell below it. */}
+				<motion.div
+					className={cn(
+						'absolute inset-0 flex flex-col lg:hidden',
+						!isMobileLocationsOpen && 'pointer-events-none'
+					)}
+					animate={
+						prefersReducedMotion
+							? { opacity: isMobileLocationsOpen ? 1 : 0 }
+							: { x: locationsPaneOffset }
+					}
+					transition={MOBILE_PANE_TRANSITION}
+					aria-hidden={!isMobileLocationsOpen}
+				>
+					<div className="relative h-full w-full overflow-hidden">
+						{/* Default sync AnimatePresence mode (no mode="wait"), so the
+						    outgoing and incoming content fully overlap instead of one
+						    waiting for the other to finish — CONTENT_SWAP_ENTER_DELAY is
+						    0, i.e. the enter animation starts the instant the exit does.
+						    Both are absolutely positioned so they can overlap without a
+						    layout jump. Direction mirrors: card enters from/exits back to
+						    the right, list enters from/exits back to the left.
+						    prefers-reduced-motion drops the slide and blur, keeping only
+						    the opacity crossfade. */}
+						<AnimatePresence initial={false}>
+							{focusedLocation ? (
+								<motion.div
+									key="card"
+									initial={
+										prefersReducedMotion
+											? { opacity: 0 }
+											: { x: 32, opacity: 0, filter: 'blur(4px)' }
+									}
+									animate={
+										prefersReducedMotion
+											? { opacity: 1 }
+											: { x: 0, opacity: 1, filter: 'blur(0px)' }
+									}
+									exit={
+										prefersReducedMotion
+											? { opacity: 0 }
+											: { x: 32, opacity: 0, filter: 'blur(4px)' }
+									}
+									transition={{
+										duration: 0.14,
+										ease: 'easeInOut',
+										delay: CONTENT_SWAP_ENTER_DELAY
+									}}
+									className="absolute inset-0 p-[11.5px]"
+								>
+									<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
+								</motion.div>
+							) : (
+								<motion.div
+									key="list"
+									initial={
+										prefersReducedMotion
+											? { opacity: 0 }
+											: { x: -32, opacity: 0, filter: 'blur(4px)' }
+									}
+									animate={
+										prefersReducedMotion
+											? { opacity: 1 }
+											: { x: 0, opacity: 1, filter: 'blur(0px)' }
+									}
+									exit={
+										prefersReducedMotion
+											? { opacity: 0 }
+											: { x: -32, opacity: 0, filter: 'blur(4px)' }
+									}
+									transition={{
+										duration: 0.14,
+										ease: 'easeInOut',
+										delay: CONTENT_SWAP_ENTER_DELAY
+									}}
+									className="absolute inset-0 flex w-full flex-col gap-[16px] p-[24px]"
+								>
+									<button
+										type="button"
+										onClick={closeMobileLocations}
+										className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-[14px] py-[10px] text-[12px] font-normal text-white transition-colors duration-200 ease-out hover:bg-[#0a2841]"
+									>
+										<svg
+											width="4"
+											height="6"
+											viewBox="0 0 4 6"
+											fill="none"
+											aria-hidden="true"
+											className="shrink-0"
+										>
+											<path
+												d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
+												fill="white"
+											/>
+										</svg>
+										Back
+									</button>
+									<div className="flex flex-1 flex-col gap-[2px] overflow-y-auto">
+										{renderLocationRows()}
+									</div>
+								</motion.div>
+							)}
+						</AnimatePresence>
+					</div>
+				</motion.div>
+			</main>
 		</div>
 	);
 }

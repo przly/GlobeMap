@@ -200,7 +200,15 @@ export default function App() {
 				    fully exits the old card before the new one enters, instead of
 				    both briefly sharing this flex column's layout space. */}
 				<AnimatePresence mode="wait">
-					{detail ? <LocationInfoCard key={detail.label} location={detail} /> : null}
+					{detail ? (
+						// LocationInfoCard itself is w-full — this fixed-width wrapper
+						// is what gives it its 361px desktop size (mobile instead
+						// matches the locations list's own responsive width; see the
+						// mobile card block below).
+						<div key={detail.label} className="w-[361px]">
+							<LocationInfoCard location={detail} />
+						</div>
+					) : null}
 				</AnimatePresence>
 				<div
 					className={cn(
@@ -349,6 +357,7 @@ export default function App() {
 							animate={{ x: 0 }}
 							exit={{ x: '100%' }}
 							transition={{ duration: 0.3, ease: 'easeInOut' }}
+							className="w-full"
 						>
 							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
 						</motion.div>

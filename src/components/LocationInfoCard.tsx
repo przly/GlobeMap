@@ -42,7 +42,12 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 			// nothing instead of closing the tooltip. Only the pin or a genuine
 			// outside click (the globe background) closes it.
 			onClick={(event) => event.stopPropagation()}
-			className="flex w-[min(361px,calc(100vw-2rem))] cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
+			// Width is entirely up to the caller (w-full) rather than a fixed
+			// 361px here — desktop wraps this in a 361px-wide container (see
+			// App.tsx), while on mobile it needs to match the locations list's
+			// width exactly, which is responsive (fills the page's padded
+			// width), not a fixed pixel value.
+			className="flex w-full cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
 		>
 			{onBack ? (
 				<button

@@ -330,14 +330,8 @@ export default function App() {
 				</div>
 			</main>
 
-			<div className="flex w-full flex-col rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden">
-				<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-mono text-[12px] leading-none font-medium tracking-[-0.24px] text-[#7c868e] uppercase">
-					locations
-				</span>
-				<div className="mx-[11.5px] shrink-0 border-t-[0.5px] border-[#cbd1d6]" />
-				<div className="flex flex-col gap-[2px] px-[11.5px] pt-[8px] pb-[11.5px]">
-					{renderLocationRows()}
-				</div>
+			<div className="flex w-full flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px] lg:hidden">
+				{renderLocationRows()}
 			</div>
 		</div>
 	);

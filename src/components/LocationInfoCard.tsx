@@ -71,9 +71,9 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 						event.stopPropagation();
 						onBack();
 					}}
-					className="-ml-[6px] inline-flex w-fit shrink-0 cursor-pointer items-center gap-[6px] self-start rounded-[9000px] py-[6px] pr-[10px] pl-[6px] text-[13px] font-medium text-[#7c868e] transition-colors duration-200 ease-out hover:bg-[#f4f6f7] hover:text-[#041c2c]"
+					className="inline-flex w-fit shrink-0 cursor-pointer items-center gap-[6px] self-start rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-[14px] py-[10px] text-[12px] font-normal text-white transition-colors duration-200 ease-out hover:bg-[#0a2841]"
 				>
-					<span aria-hidden="true" className="text-[13px] leading-none">
+					<span aria-hidden="true" className="text-[12px] leading-none">
 						←
 					</span>
 					Back

@@ -1,4 +1,5 @@
 import { motion } from 'motion/react';
+import { cn } from '../lib/cn';
 import type { LocationDetail } from '../lib/locations';
 
 interface Props {
@@ -28,11 +29,17 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function LocationInfoCard({ location, onBack }: Props) {
+	// onBack only exists for the mobile card (see App.tsx) — reused here as
+	// the signal to drop the blur-in/out and shadow, which read as redundant
+	// on mobile where the card already has its own slide transition and sits
+	// directly on the page instead of floating over the globe.
+	const isMobile = Boolean(onBack);
+
 	return (
 		<motion.div
-			initial={{ opacity: 0, filter: 'blur(16px)' }}
-			animate={{ opacity: 1, filter: 'blur(0px)' }}
-			exit={{ opacity: 0, filter: 'blur(16px)' }}
+			initial={{ opacity: 0, filter: isMobile ? 'none' : 'blur(16px)' }}
+			animate={{ opacity: 1, filter: 'none' }}
+			exit={{ opacity: 0, filter: isMobile ? 'none' : 'blur(16px)' }}
 			transition={{ duration: 0.3, ease: 'easeOut' }}
 			// The pin and card share one click-to-toggle handler up on
 			// GlobeMarkerItem's wrapper (so clicking the pin opens/closes the
@@ -47,7 +54,10 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 			// App.tsx), while on mobile it needs to match the locations list's
 			// width exactly, which is responsive (fills the page's padded
 			// width), not a fixed pixel value.
-			className="flex w-full cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
+			className={cn(
+				'flex w-full cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px]',
+				isMobile ? '' : 'shadow-xl'
+			)}
 		>
 			{onBack ? (
 				<button

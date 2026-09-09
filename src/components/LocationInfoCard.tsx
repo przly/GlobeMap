@@ -94,13 +94,17 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 				<div className="flex w-full items-center justify-between">
 					{/* Every location currently shares the same placeholder image
 					    (see PLACEHOLDER_FLAG in lib/locations.ts) until the CMS
-					    supplies real per-country flags. */}
-					<img
-						src={location.countryFlag}
-						alt=""
-						aria-hidden="true"
-						className="size-[24px] shrink-0 rounded-[4px] border-[0.5px] border-black/10 object-cover"
-					/>
+					    supplies real per-country flags. The 24x24 box is just a
+					    consistent layout slot — the flag itself keeps its natural
+					    22:16 aspect ratio inside it, centered, rather than being
+					    stretched/cropped square. */}
+					<span className="flex size-[24px] shrink-0 items-center justify-center" aria-hidden="true">
+						<img
+							src={location.countryFlag}
+							alt=""
+							className="h-[16px] w-[22px] rounded-[4px] border-[0.5px] border-black/10 object-cover"
+						/>
+					</span>
 					{location.hasDataCenter ? (
 						<span className="inline-flex shrink-0 items-center gap-[6px] rounded-[6060px] border border-[#82e472] bg-[#44d62c] py-[8px] pr-[12px] pl-[8px] text-[12px] leading-none text-[#041c2c] uppercase">
 							<svg

@@ -375,7 +375,7 @@ export default function App() {
 						<span className="absolute inset-0 -translate-x-full rounded-full bg-[#f4f6f7] transition-transform duration-200 ease-out group-hover:translate-x-0 group-active:translate-x-0" />
 					)}
 					<span
-						className={`relative flex w-full items-center justify-between gap-[8px] px-[20px] py-[12px] text-left font-['Inter'] text-[14px] leading-[1.5] font-normal transition-colors duration-200 ease-out ${
+						className={`relative flex w-full items-center gap-[6px] px-[20px] py-[12px] text-left font-['Inter'] text-[14px] leading-[1.5] font-normal transition-colors duration-200 ease-out ${
 							focused
 								? 'text-white'
 								: 'text-[#7c868e] group-hover:text-[#041c2c] group-active:text-[#041c2c]'

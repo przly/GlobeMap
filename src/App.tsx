@@ -304,11 +304,15 @@ export default function App() {
 					{focused ? (
 						<span className="absolute inset-0 rounded-full bg-[#041c2c]" />
 					) : (
-						<span className="absolute inset-0 -translate-x-full rounded-full bg-[#f4f6f7] transition-transform duration-200 ease-out group-hover:translate-x-0" />
+						// group-active mirrors group-hover so tapping a row on mobile
+						// (which has no :hover) gets the same gray press feedback
+						// desktop gets on hover — a no-op on desktop, since hover
+						// already covers that case there.
+						<span className="absolute inset-0 -translate-x-full rounded-full bg-[#f4f6f7] transition-transform duration-200 ease-out group-hover:translate-x-0 group-active:translate-x-0" />
 					)}
 					<span
 						className={`relative block px-[20px] py-[12px] text-left font-['Inter'] text-[14px] leading-[1.5] font-normal transition-colors duration-200 ease-out ${
-							focused ? 'text-white' : 'text-[#7c868e] group-hover:text-[#041c2c]'
+							focused ? 'text-white' : 'text-[#7c868e] group-hover:text-[#041c2c] group-active:text-[#041c2c]'
 						}`}
 					>
 						{loc.label}

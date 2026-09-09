@@ -42,9 +42,9 @@ const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
 // Mobile-only: the globe card steps through three full-size views — globe,
 // locations list, and a focused location's card — stacked with absolute
-// inset-0 and crossfaded with the same small ±32px nudge + blur the
-// list<->card swap always used (see mobileStep/mobileStepDirection below),
-// not a full-width slide. The globe view stays mounted at all times so the
+// inset-0 and crossfaded with a small ±32px nudge + opacity (see
+// mobileStep/mobileStepDirection below), not a full-width slide. The globe
+// view stays mounted at all times so the
 // WebGL canvas is never torn down/rebuilt by the swap; list and card
 // mount/unmount via AnimatePresence since they're cheap to recreate.
 type MobileStep = 'globe' | 'list' | 'card';
@@ -146,10 +146,9 @@ export default function App() {
 			setOffsetY(defaultOffsetY);
 		}
 		// A resize onto the desktop breakpoint while mid-way through
-		// globe→list→card would otherwise leave the globe pane's blurred,
-		// -32px, opacity-0 "inactive" state in place (see mobileStep below),
-		// hiding the globe on desktop, since that state isn't itself
-		// breakpoint-gated.
+		// globe→list→card would otherwise leave the globe pane's -32px,
+		// opacity-0 "inactive" state in place (see mobileStep below), hiding
+		// the globe on desktop, since that state isn't itself breakpoint-gated.
 		if (isDesktop) setIsMobileLocationsOpen(false);
 	}
 
@@ -405,21 +404,19 @@ export default function App() {
 		});
 	}
 
-	// Variants for the list/card panes below — the same ±32px nudge + blur
-	// crossfade the list<->card swap always used. `custom` (the direction
-	// Framer passes through from AnimatePresence, see mobileStepDirection
-	// above) decides which side: entering/exiting to the right for a forward
-	// step, to the left for a backward one.
+	// Variants for the list/card panes below — a ±32px nudge + opacity
+	// crossfade (no blur — dropped to see whether it was contributing to the
+	// frame drops the same way it was on the globe pane, see the no-blur
+	// comment on that pane below). `custom` (the direction Framer passes
+	// through from AnimatePresence, see mobileStepDirection above) decides
+	// which side: entering/exiting to the right for a forward step, to the
+	// left for a backward one.
 	const mobilePageVariants = {
 		enter: (direction: 1 | -1) =>
-			prefersReducedMotion
-				? { opacity: 0 }
-				: { x: direction === 1 ? 32 : -32, opacity: 0, filter: 'blur(4px)' },
-		center: prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' },
+			prefersReducedMotion ? { opacity: 0 } : { x: direction === 1 ? 32 : -32, opacity: 0 },
+		center: prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1 },
 		exit: (direction: 1 | -1) =>
-			prefersReducedMotion
-				? { opacity: 0 }
-				: { x: direction === 1 ? -32 : 32, opacity: 0, filter: 'blur(4px)' }
+			prefersReducedMotion ? { opacity: 0 } : { x: direction === 1 ? -32 : 32, opacity: 0 }
 	};
 
 	return (

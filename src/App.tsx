@@ -33,6 +33,21 @@ const baseMarkerSize = 0.06;
 // needs roughly 960px+ of width to avoid the two overlapping.
 const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
+// Mobile-only: the swap shell's fixed height, matching the locations list's
+// own natural height exactly (row height 45px = py-[12px]*2 + a 14px/1.5
+// line's 21px line-height; ROW_GAP is the list's gap-[2px]; PADDING is its
+// p-[11.5px]) so the info card's content can justify-between to fill it
+// (see LocationInfoCard) instead of the two ending up different heights.
+// Computed from locations.length rather than hardcoded so it stays correct
+// if the location count changes.
+const MOBILE_LIST_ROW_HEIGHT = 45;
+const MOBILE_LIST_ROW_GAP = 2;
+const MOBILE_LIST_PADDING = 11.5;
+const MOBILE_LIST_HEIGHT =
+	locations.length * MOBILE_LIST_ROW_HEIGHT +
+	(locations.length - 1) * MOBILE_LIST_ROW_GAP +
+	MOBILE_LIST_PADDING * 2;
+
 // Desktop-only: while a location is focused, the globe pans down so the
 // focused marker's rest position (dead-center, pre-offset, since focusing
 // rotates the marker to face the camera) lands near the bottom of the globe
@@ -351,7 +366,10 @@ export default function App() {
 			    page overflow; initial={false} on AnimatePresence means the list
 			    just appears normally on first load instead of sliding in from
 			    the left as if it had just "come back" from a card. */}
-			<div className="w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden">
+			<div
+				className="w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden"
+				style={{ height: MOBILE_LIST_HEIGHT }}
+			>
 				<AnimatePresence mode="wait" initial={false}>
 					{focusedLocation ? (
 						<motion.div
@@ -360,6 +378,7 @@ export default function App() {
 							animate={{ x: 0 }}
 							exit={{ x: '100%' }}
 							transition={{ duration: 0.3, ease: 'easeInOut' }}
+							className="h-full"
 						>
 							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
 						</motion.div>

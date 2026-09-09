@@ -59,7 +59,12 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 			// width exactly, which is responsive (fills the page's padded
 			// width), not a fixed pixel value.
 			className={cn(
-				'flex w-full cursor-default flex-col p-[24px]',
+				'flex w-full cursor-default flex-col',
+				// Mobile renders this bare (no chrome — see below) directly inside
+				// the globe card's own mobile pane (see App.tsx), which otherwise
+				// pads its content 36px in from the card edge, so this carries
+				// that same 36px itself to match the globe/list panes' padding.
+				isMobile ? 'p-[36px]' : 'p-[24px]',
 				isMobile ? 'h-full justify-between' : 'gap-[32px]',
 				isMobile ? '' : 'rounded-[36px] border border-[#e6eaed] bg-white shadow-xl'
 			)}
@@ -73,7 +78,14 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 					}}
 					className="inline-flex w-fit shrink-0 cursor-pointer items-center gap-[6px] self-start rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-[14px] py-[10px] text-[12px] font-normal text-white transition-colors duration-200 ease-out hover:bg-[#0a2841]"
 				>
-					<svg width="4" height="6" viewBox="0 0 4 6" fill="none" aria-hidden="true" className="shrink-0">
+					<svg
+						width="4"
+						height="6"
+						viewBox="0 0 4 6"
+						fill="none"
+						aria-hidden="true"
+						className="shrink-0"
+					>
 						<path
 							d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
 							fill="white"
@@ -98,7 +110,10 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 					    consistent layout slot — the flag itself keeps its natural
 					    22:16 aspect ratio inside it, centered, rather than being
 					    stretched/cropped square. */}
-					<span className="flex size-[24px] shrink-0 items-center justify-center" aria-hidden="true">
+					<span
+						className="flex size-[24px] shrink-0 items-center justify-center"
+						aria-hidden="true"
+					>
 						<img
 							src={location.countryFlag}
 							alt=""
@@ -146,7 +161,14 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 					className="inline-flex shrink-0 items-center gap-[6px] self-end rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224]"
 				>
 					Visit website
-					<svg width="8" height="7" viewBox="0 0 8 7" fill="none" aria-hidden="true" className="shrink-0">
+					<svg
+						width="8"
+						height="7"
+						viewBox="0 0 8 7"
+						fill="none"
+						aria-hidden="true"
+						className="shrink-0"
+					>
 						<path
 							d="M5.47461 3.8748H0.44961C0.32461 3.8748 0.216276 3.83314 0.124609 3.7498C0.0412762 3.65814 -0.00039041 3.5498 -0.00039041 3.4248C-0.00039041 3.2998 0.0412762 3.19564 0.124609 3.1123C0.216276 3.02064 0.32461 2.9748 0.44961 2.9748H5.47461L3.27461 0.774804C3.18294 0.683138 3.13711 0.578971 3.13711 0.462304C3.13711 0.337304 3.18294 0.228971 3.27461 0.137304C3.36628 0.0456374 3.47044 -0.00019598 3.58711 -0.00019598C3.71211 -0.00019598 3.82044 0.0456374 3.91211 0.137304L6.88711 3.1123C6.92878 3.15397 6.95794 3.20397 6.97461 3.2623C6.99961 3.3123 7.01211 3.36647 7.01211 3.4248C7.01211 3.48314 6.99961 3.54147 6.97461 3.5998C6.95794 3.6498 6.92878 3.69564 6.88711 3.7373L3.91211 6.7123C3.82044 6.80397 3.71628 6.8498 3.59961 6.8498C3.48294 6.84147 3.37878 6.79147 3.28711 6.6998C3.19544 6.60814 3.14961 6.50397 3.14961 6.3873C3.14961 6.2623 3.19544 6.15397 3.28711 6.0623L5.47461 3.8748Z"
 							fill="#041C2C"

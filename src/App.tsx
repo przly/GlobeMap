@@ -453,7 +453,7 @@ export default function App() {
 						{renderLocationRows()}
 					</div>
 
-					<div className="pointer-events-none absolute top-8 left-8 flex w-[calc(100%-64px)] flex-col items-start gap-4 lg:hidden">
+					<div className="pointer-events-none absolute top-[36px] left-[36px] flex w-[calc(100%-72px)] flex-col items-start gap-4 lg:hidden">
 						<p className="font-['Inter'] text-[36px] leading-none font-medium tracking-[-0.72px] text-[#041c2c]">
 							<span className="leading-none">Built across Europe, </span>
 							<span className="leading-none text-[#7c868e]">with local partners.</span>
@@ -475,7 +475,7 @@ export default function App() {
 					<button
 						type="button"
 						onClick={openMobileLocations}
-						className="pointer-events-auto absolute right-8 bottom-8 inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-4 py-3 text-sm font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224] lg:hidden"
+						className="pointer-events-auto absolute right-[36px] bottom-[36px] inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-4 py-3 text-sm font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224] lg:hidden"
 					>
 						Explore locations
 						<span aria-hidden="true" className="text-sm leading-none">
@@ -500,7 +500,7 @@ export default function App() {
 							animate="center"
 							exit="exit"
 							transition={MOBILE_PANE_TRANSITION}
-							className="absolute inset-0 flex w-full flex-col gap-[16px] p-[24px] lg:hidden"
+							className="absolute inset-0 flex w-full flex-col gap-[16px] p-[36px] lg:hidden"
 						>
 							<button
 								type="button"
@@ -535,8 +535,12 @@ export default function App() {
 							animate="center"
 							exit="exit"
 							transition={MOBILE_PANE_TRANSITION}
-							className="absolute inset-0 p-[11.5px] lg:hidden"
+							className="absolute inset-0 lg:hidden"
 						>
+							{/* LocationInfoCard supplies its own 36px padding in its
+							    mobile (bare, no chrome) variant — see isMobile there —
+							    so this pane doesn't add a second layer of padding on
+							    top of it the way the list pane's does. */}
 							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
 						</motion.div>
 					) : null}

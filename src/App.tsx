@@ -559,8 +559,17 @@ export default function App() {
 							    position exactly where it was. Top gets no such
 							    treatment: the footer's top edge is exactly where the
 							    scrollable list above it ends, which is where the
-							    gradient should start fading in from, per the brief. */}
-							<div className="relative -mx-[36px] -mb-[36px] shrink-0 px-[36px] pb-[36px]">
+							    gradient should start fading in from, per the brief.
+							    z-0 (not just relative) makes this its own stacking
+							    context, so the gradient's -z-10 below is always resolved
+							    locally against it — without an explicit z-index here, the
+							    gradient's context depends on whether the *animated*
+							    list-pane ancestor currently has a live transform/opacity
+							    inline style (only true while Framer's transition is
+							    actually running), so the gradient would render correctly
+							    mid-transition but escape behind the whole card once it
+							    settles and that inline styling drops away. */}
+							<div className="relative z-0 -mx-[36px] -mb-[36px] shrink-0 px-[36px] pb-[36px]">
 								{/* z-index below the button (a plain, non-positioned
 								    element) so it paints as a backdrop behind it rather
 								    than over it — an absolutely positioned layer with no

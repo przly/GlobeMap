@@ -35,13 +35,14 @@ const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
 // Mobile-only: the globe card steps through three full-size views — globe,
 // locations list, and a focused location's card — stacked with absolute
-// inset-0 and swapped with a 100% x offset (see mobileStep/mobileStepDirection
-// below) instead of resizing or scrolling. The globe view stays mounted at
-// all times so the WebGL canvas is never torn down/rebuilt by the swap; list
-// and card mount/unmount via AnimatePresence since they're cheap to recreate.
+// inset-0 and crossfaded with the same small ±32px nudge + blur the
+// list<->card swap always used (see mobileStep/mobileStepDirection below),
+// not a full-width slide. The globe view stays mounted at all times so the
+// WebGL canvas is never torn down/rebuilt by the swap; list and card
+// mount/unmount via AnimatePresence since they're cheap to recreate.
 type MobileStep = 'globe' | 'list' | 'card';
 const MOBILE_STEP_ORDER: Record<MobileStep, number> = { globe: 0, list: 1, card: 2 };
-const MOBILE_PANE_TRANSITION = { duration: 0.35, ease: 'easeInOut' } as const;
+const MOBILE_PANE_TRANSITION = { duration: 0.14, ease: 'easeInOut' } as const;
 
 // Desktop-only: while a location is focused, the globe pans down so the
 // focused marker's rest position (dead-center, pre-offset, since focusing
@@ -361,19 +362,21 @@ export default function App() {
 		});
 	}
 
-	// Variants for the list/card panes below — each is pushed fully off to
-	// one side (100% of the card's own width, clipped by the parent's
-	// overflow-hidden) rather than a small nudge, since this is a full
-	// page-style swap of the whole card's content. `custom` (the direction
+	// Variants for the list/card panes below — the same ±32px nudge + blur
+	// crossfade the list<->card swap always used. `custom` (the direction
 	// Framer passes through from AnimatePresence, see mobileStepDirection
 	// above) decides which side: entering/exiting to the right for a forward
 	// step, to the left for a backward one.
 	const mobilePageVariants = {
 		enter: (direction: 1 | -1) =>
-			prefersReducedMotion ? { opacity: 0 } : { x: direction === 1 ? '100%' : '-100%' },
-		center: prefersReducedMotion ? { opacity: 1 } : { x: '0%' },
+			prefersReducedMotion
+				? { opacity: 0 }
+				: { x: direction === 1 ? 32 : -32, opacity: 0, filter: 'blur(4px)' },
+		center: prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' },
 		exit: (direction: 1 | -1) =>
-			prefersReducedMotion ? { opacity: 0 } : { x: direction === 1 ? '-100%' : '100%' }
+			prefersReducedMotion
+				? { opacity: 0 }
+				: { x: direction === 1 ? -32 : 32, opacity: 0, filter: 'blur(4px)' }
 	};
 
 	return (
@@ -387,7 +390,11 @@ export default function App() {
 					animate={
 						prefersReducedMotion
 							? { opacity: mobileStep === 'globe' ? 1 : 0 }
-							: { x: mobileStep === 'globe' ? '0%' : '-100%' }
+							: {
+									x: mobileStep === 'globe' ? 0 : -32,
+									opacity: mobileStep === 'globe' ? 1 : 0,
+									filter: mobileStep === 'globe' ? 'blur(0px)' : 'blur(4px)'
+								}
 					}
 					transition={MOBILE_PANE_TRANSITION}
 					aria-hidden={mobileStep !== 'globe'}

@@ -138,6 +138,13 @@ export default function App() {
 		size: markerSize
 	}));
 
+	// Mobile-only: the focused location's card renders in its own block
+	// under the globe card (see the JSX below) rather than through the
+	// marker-tooltip system used on desktop (isDesktop-gated here so the
+	// two never both render the card at once).
+	const focusedLocation =
+		focusOn && !isDesktop ? locations.find((loc) => isFocused(focusOn, loc.location)) : undefined;
+
 	function selectLocation(location: [number, number]) {
 		const nextFocus = isFocused(focusOn, location) ? null : location;
 		setFocusOn(nextFocus);
@@ -172,7 +179,13 @@ export default function App() {
 
 	function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
 		const focused = isFocused(focusOn, marker.location);
-		const detail = focused ? locations.find((loc) => isFocused(marker.location, loc.location)) : undefined;
+		// On mobile the info card renders in its own block under the globe
+		// card (see the bottom of the JSX below) instead of floating over the
+		// canvas anchored to the marker — the mobile canvas is too small for a
+		// pin-anchored card to reliably avoid clipping. The pin itself still
+		// renders here either way.
+		const detail =
+			focused && isDesktop ? locations.find((loc) => isFocused(marker.location, loc.location)) : undefined;
 
 		// Always the same flex-column shape, with the pin always last — only
 		// whether the card sibling exists changes. Keeping the pin's position
@@ -323,6 +336,16 @@ export default function App() {
 					</button>
 				</div>
 			</main>
+
+			{/* AnimatePresence renders no DOM wrapper of its own, so this
+			    contributes nothing to the page's flex gap when nothing is
+			    focused — no lg:hidden needed either, since LocationInfoCard
+			    only ever exists here on mobile (see renderMarkerTooltip). */}
+			<AnimatePresence mode="wait">
+				{focusedLocation ? (
+					<LocationInfoCard key={focusedLocation.label} location={focusedLocation} />
+				) : null}
+			</AnimatePresence>
 
 			<div className="flex w-full flex-col rounded-[12px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden">
 				<span className="shrink-0 pt-[15.5px] pb-[16px] pl-[23.5px] font-mono text-[12px] leading-none font-medium tracking-[-0.24px] text-[#7c868e] uppercase">

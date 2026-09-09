@@ -91,7 +91,7 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 							fill="white"
 						/>
 					</svg>
-					Back
+					Back to list
 				</button>
 			) : null}
 

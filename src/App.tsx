@@ -520,7 +520,7 @@ export default function App() {
 										fill="white"
 									/>
 								</svg>
-								Back
+								Back to map
 							</button>
 							{/* min-h-0 overrides the flex item's default min-height:
 							    auto, which would otherwise let it grow past the pane's

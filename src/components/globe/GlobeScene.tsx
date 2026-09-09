@@ -118,6 +118,14 @@ interface Props {
 	 * @default 0
 	 */
 	axialTilt?: number;
+	/**
+	 * Whether the render loop should keep ticking. While false, the loop
+	 * keeps running (so it's ready to resume instantly) but skips its
+	 * per-frame work entirely — no uniform/uTime update, no marker
+	 * projection, no render call — so a hidden globe costs nothing.
+	 * @default true
+	 */
+	active?: boolean;
 }
 
 interface ProjectedMarker {
@@ -313,7 +321,8 @@ export default function GlobeScene({
 	onMarkerClick,
 	onBackgroundClick,
 	onDoubleTap,
-	focusOn = null
+	focusOn = null,
+	active = true
 }: Props) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [projectedMarkers, setProjectedMarkers] = useState<ProjectedMarker[]>([]);
@@ -343,7 +352,8 @@ export default function GlobeScene({
 		autoRotate,
 		markers,
 		onBackgroundClick,
-		onDoubleTap
+		onDoubleTap,
+		active
 	});
 	useEffect(() => {
 		latestRef.current = {
@@ -356,7 +366,8 @@ export default function GlobeScene({
 			autoRotate,
 			markers,
 			onBackgroundClick,
-			onDoubleTap
+			onDoubleTap,
+			active
 		};
 	});
 
@@ -1021,6 +1032,17 @@ export default function GlobeScene({
 		let previous = 0;
 		const tick = (now: number) => {
 			const live = latestRef.current;
+			// Inactive (e.g. hidden behind another mobile pane — see App.tsx):
+			// skip resizing, rotation/pulse timing, marker projection, and the
+			// render call entirely, so a hidden globe costs nothing and never
+			// competes with whatever transition is bringing it back onscreen.
+			// `previous` still tracks `now` here so the resumed frame computes a
+			// small delta instead of one big jump across the entire paused span.
+			if (!live.active) {
+				previous = now;
+				raf = window.requestAnimationFrame(tick);
+				return;
+			}
 			const w = Math.max(1, targetCanvas.clientWidth);
 			const h = Math.max(1, targetCanvas.clientHeight);
 			const bufW = Math.round(w * renderer.dpr);

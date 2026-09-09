@@ -451,6 +451,13 @@ export default function App() {
 						focusOn={focusOn}
 						autoRotate={!focusOn}
 						lockedPolarAngle={isDesktop ? !focusOn : false}
+						// Stays true on desktop (mobileStep is always 'globe' there —
+						// nothing ever opens the mobile locations pane) and pauses the
+						// whole render loop on mobile whenever the globe pane isn't the
+						// active step, so it isn't still burning CPU/GPU — and
+						// competing with the transition bringing it back — the entire
+						// time it's hidden behind the list/card pane.
+						active={mobileStep === 'globe'}
 					/>
 
 					<div className="absolute top-[47.5px] left-[47.5px] hidden items-center gap-[48px] lg:flex">

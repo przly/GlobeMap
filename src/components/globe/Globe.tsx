@@ -96,6 +96,16 @@ interface Props extends Omit<ComponentPropsWithoutRef<'div'>, 'className'> {
 	 * When set, auto-rotation will be disabled temporarily.
 	 */
 	focusOn?: [number, number] | null;
+	/**
+	 * Whether the scene's render loop should keep running. Set to false
+	 * while the globe is offscreen/hidden (e.g. behind another mobile pane)
+	 * to stop it burning CPU/GPU — and stop it competing for the main thread
+	 * with whatever transition is bringing it back — on work nobody can see.
+	 * Rotation and marker pulse timing simply hold in place, not accumulate,
+	 * while inactive, and pick back up smoothly once reactivated.
+	 * @default true
+	 */
+	active?: SceneProps['active'];
 }
 
 export default function Globe({
@@ -117,6 +127,7 @@ export default function Globe({
 	onBackgroundClick,
 	onDoubleTap,
 	focusOn = null,
+	active = true,
 	...rest
 }: Props) {
 	return (
@@ -145,6 +156,7 @@ export default function Globe({
 					onBackgroundClick={onBackgroundClick}
 					onDoubleTap={onDoubleTap}
 					focusOn={focusOn}
+					active={active}
 				/>
 			</div>
 		</div>

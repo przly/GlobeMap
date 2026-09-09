@@ -33,19 +33,14 @@ const baseMarkerSize = 0.06;
 // needs roughly 960px+ of width to avoid the two overlapping.
 const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 
-// Mobile-only: the list<->card content swap uses AnimatePresence's default
-// sync mode (enter and exit run together, not one after the other), so
-// there's no gap to delay the enter for — kept as an explicit named
-// constant rather than just omitting `delay` so that intent reads clearly
-// at the call site.
-const CONTENT_SWAP_ENTER_DELAY = 0;
-
-// Mobile-only: the globe/title pane and the locations pane are two full-size
-// siblings stacked with absolute inset-0 inside the (overflow-hidden) globe
-// card, pushed off to either side with a 100% x offset when inactive. Both
-// panes always stay mounted — only their x offset (and, under reduced
-// motion, opacity) changes — so the globe canvas is never torn down/rebuilt
-// by the swap.
+// Mobile-only: the globe card steps through three full-size views — globe,
+// locations list, and a focused location's card — stacked with absolute
+// inset-0 and swapped with a 100% x offset (see mobileStep/mobileStepDirection
+// below) instead of resizing or scrolling. The globe view stays mounted at
+// all times so the WebGL canvas is never torn down/rebuilt by the swap; list
+// and card mount/unmount via AnimatePresence since they're cheap to recreate.
+type MobileStep = 'globe' | 'list' | 'card';
+const MOBILE_STEP_ORDER: Record<MobileStep, number> = { globe: 0, list: 1, card: 2 };
 const MOBILE_PANE_TRANSITION = { duration: 0.35, ease: 'easeInOut' } as const;
 
 // Desktop-only: while a location is focused, the globe pans down so the
@@ -102,10 +97,10 @@ function usePrefersReducedMotion() {
 export default function App() {
 	const isDesktop = useIsDesktop();
 	const prefersReducedMotion = usePrefersReducedMotion();
-	// Mobile-only: which of the two panes inside the globe card is showing —
-	// see MOBILE_PANE_TRANSITION above. "Explore locations" opens the
-	// locations pane; its own Back control (or picking nothing) closes it
-	// again, sliding the globe/title pane back into view.
+	// Mobile-only: whether the card has left the globe view at all — combined
+	// with focusOn below to derive `mobileStep` (globe/list/card). "Explore
+	// locations" opens it (landing on the list); its own Back control closes
+	// it again, sliding the globe view back into view.
 	const [isMobileLocationsOpen, setIsMobileLocationsOpen] = useState(false);
 
 	function openMobileLocations() {
@@ -142,10 +137,10 @@ export default function App() {
 			setOffsetX(defaultOffsetX);
 			setOffsetY(defaultOffsetY);
 		}
-		// A resize onto the desktop breakpoint while the mobile locations pane
-		// was open would otherwise leave the globe pane's -100% x offset in
-		// place (see globePaneOffset below), hiding the globe entirely on
-		// desktop, since that state isn't itself breakpoint-gated.
+		// A resize onto the desktop breakpoint while mid-way through
+		// globe→list→card would otherwise leave the globe pane's -100% x
+		// offset in place (see mobileStep below), hiding the globe entirely
+		// on desktop, since that state isn't itself breakpoint-gated.
 		if (isDesktop) setIsMobileLocationsOpen(false);
 	}
 
@@ -197,10 +192,38 @@ export default function App() {
 	const focusedLocation =
 		focusOn && !isDesktop ? locations.find((loc) => isFocused(focusOn, loc.location)) : undefined;
 
+	// Mobile-only: the current step in the globe→list→card sequence, derived
+	// from isMobileLocationsOpen + focusedLocation rather than tracked
+	// directly, so the two can never disagree about what's showing.
+	const mobileStep: MobileStep = !isMobileLocationsOpen
+		? 'globe'
+		: focusedLocation
+			? 'card'
+			: 'list';
+
+	// Tracks the previous step during render (same "adjust state while
+	// rendering" pattern as prevIsDesktop below) purely to know which
+	// direction the current transition moves in — forward (deeper into
+	// globe→list→card) or backward — even when a step gets skipped, e.g.
+	// tapping a marker jumps straight from globe to card. List/Card read
+	// this off the `custom` prop on their AnimatePresence below, which
+	// Framer forwards to the exiting pane too so the entering and exiting
+	// pane always agree on direction.
+	const [prevMobileStep, setPrevMobileStep] = useState<MobileStep>(mobileStep);
+	let mobileStepDirection: 1 | -1 = 1;
+	if (mobileStep !== prevMobileStep) {
+		mobileStepDirection =
+			MOBILE_STEP_ORDER[mobileStep] > MOBILE_STEP_ORDER[prevMobileStep] ? 1 : -1;
+		setPrevMobileStep(mobileStep);
+	}
+
 	function selectLocation(location: [number, number]) {
 		const nextFocus = isFocused(focusOn, location) ? null : location;
 		setFocusOn(nextFocus);
 		setIsDoubleTapZoomed(false);
+		// Tapping a marker directly on the mobile globe view should land
+		// straight on its card, skipping the list — see mobileStep above.
+		if (!isDesktop && nextFocus) setIsMobileLocationsOpen(true);
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
 		if (isDesktop) {
 			animateOffsetXTo(nextFocus ? DESKTOP_FOCUS_OFFSET_X : defaultOffsetX);
@@ -338,15 +361,20 @@ export default function App() {
 		});
 	}
 
-	// Mobile-only: whichever pane is inactive is pushed fully off to one side
-	// (100% of the card's own width, via the parent's overflow-hidden) rather
-	// than a small nudge — this is a full page-style swap of the whole card's
-	// content, not the smaller in-place crossfade the list<->card swap below
-	// still uses. Both stay mounted throughout (including on desktop, where
-	// the offset is always 0 since only the mobile-only "Explore locations"
-	// button can open it) so the globe canvas is never rebuilt.
-	const globePaneOffset = isMobileLocationsOpen ? '-100%' : '0%';
-	const locationsPaneOffset = isMobileLocationsOpen ? '0%' : '100%';
+	// Variants for the list/card panes below — each is pushed fully off to
+	// one side (100% of the card's own width, clipped by the parent's
+	// overflow-hidden) rather than a small nudge, since this is a full
+	// page-style swap of the whole card's content. `custom` (the direction
+	// Framer passes through from AnimatePresence, see mobileStepDirection
+	// above) decides which side: entering/exiting to the right for a forward
+	// step, to the left for a backward one.
+	const mobilePageVariants = {
+		enter: (direction: 1 | -1) =>
+			prefersReducedMotion ? { opacity: 0 } : { x: direction === 1 ? '100%' : '-100%' },
+		center: prefersReducedMotion ? { opacity: 1 } : { x: '0%' },
+		exit: (direction: 1 | -1) =>
+			prefersReducedMotion ? { opacity: 0 } : { x: direction === 1 ? '-100%' : '100%' }
+	};
 
 	return (
 		<div className="flex min-h-screen w-full flex-col items-center gap-4 bg-white px-4 py-6 lg:justify-center lg:px-6">
@@ -354,15 +382,15 @@ export default function App() {
 				<motion.div
 					className={cn(
 						'absolute inset-0',
-						isMobileLocationsOpen && 'pointer-events-none lg:pointer-events-auto'
+						mobileStep !== 'globe' && 'pointer-events-none lg:pointer-events-auto'
 					)}
 					animate={
 						prefersReducedMotion
-							? { opacity: isMobileLocationsOpen ? 0 : 1 }
-							: { x: globePaneOffset }
+							? { opacity: mobileStep === 'globe' ? 1 : 0 }
+							: { x: mobileStep === 'globe' ? '0%' : '-100%' }
 					}
 					transition={MOBILE_PANE_TRANSITION}
-					aria-hidden={isMobileLocationsOpen}
+					aria-hidden={mobileStep !== 'globe'}
 				>
 					<Globe
 						className={cn(
@@ -439,116 +467,63 @@ export default function App() {
 					</button>
 				</motion.div>
 
-				{/* Mobile-only second pane, pushed off to the right until
-				    "Explore locations" is tapped, then slides in to fully
-				    replace the pane above (see globePaneOffset/locationsPaneOffset).
-				    The list<->card swap inside it is untouched — same small
-				    ±32px/blur crossfade as before, just now filling the whole
-				    card instead of a shorter shell below it. */}
-				<motion.div
-					className={cn(
-						'absolute inset-0 flex flex-col lg:hidden',
-						!isMobileLocationsOpen && 'pointer-events-none'
-					)}
-					animate={
-						prefersReducedMotion
-							? { opacity: isMobileLocationsOpen ? 1 : 0 }
-							: { x: locationsPaneOffset }
-					}
-					transition={MOBILE_PANE_TRANSITION}
-					aria-hidden={!isMobileLocationsOpen}
-				>
-					<div className="relative h-full w-full overflow-hidden">
-						{/* Default sync AnimatePresence mode (no mode="wait"), so the
-						    outgoing and incoming content fully overlap instead of one
-						    waiting for the other to finish — CONTENT_SWAP_ENTER_DELAY is
-						    0, i.e. the enter animation starts the instant the exit does.
-						    Both are absolutely positioned so they can overlap without a
-						    layout jump. Direction mirrors: card enters from/exits back to
-						    the right, list enters from/exits back to the left.
-						    prefers-reduced-motion drops the slide and blur, keeping only
-						    the opacity crossfade. */}
-						<AnimatePresence initial={false}>
-							{focusedLocation ? (
-								<motion.div
-									key="card"
-									initial={
-										prefersReducedMotion
-											? { opacity: 0 }
-											: { x: 32, opacity: 0, filter: 'blur(4px)' }
-									}
-									animate={
-										prefersReducedMotion
-											? { opacity: 1 }
-											: { x: 0, opacity: 1, filter: 'blur(0px)' }
-									}
-									exit={
-										prefersReducedMotion
-											? { opacity: 0 }
-											: { x: 32, opacity: 0, filter: 'blur(4px)' }
-									}
-									transition={{
-										duration: 0.14,
-										ease: 'easeInOut',
-										delay: CONTENT_SWAP_ENTER_DELAY
-									}}
-									className="absolute inset-0 p-[11.5px]"
+				{/* Mobile-only: the list and card panes, filling the same card the
+				    globe pane above does. Only one is ever mounted (as opposed to
+				    the always-mounted globe pane) — cheap to recreate, unlike the
+				    WebGL canvas — so they participate directly in the same
+				    AnimatePresence and share its `custom` direction, keeping all
+				    three steps on one consistent forward/backward convention. */}
+				<AnimatePresence initial={false} custom={mobileStepDirection}>
+					{mobileStep === 'list' ? (
+						<motion.div
+							key="list"
+							custom={mobileStepDirection}
+							variants={mobilePageVariants}
+							initial="enter"
+							animate="center"
+							exit="exit"
+							transition={MOBILE_PANE_TRANSITION}
+							className="absolute inset-0 flex w-full flex-col gap-[16px] p-[24px] lg:hidden"
+						>
+							<button
+								type="button"
+								onClick={closeMobileLocations}
+								className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-[14px] py-[10px] text-[12px] font-normal text-white transition-colors duration-200 ease-out hover:bg-[#0a2841]"
+							>
+								<svg
+									width="4"
+									height="6"
+									viewBox="0 0 4 6"
+									fill="none"
+									aria-hidden="true"
+									className="shrink-0"
 								>
-									<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
-								</motion.div>
-							) : (
-								<motion.div
-									key="list"
-									initial={
-										prefersReducedMotion
-											? { opacity: 0 }
-											: { x: -32, opacity: 0, filter: 'blur(4px)' }
-									}
-									animate={
-										prefersReducedMotion
-											? { opacity: 1 }
-											: { x: 0, opacity: 1, filter: 'blur(0px)' }
-									}
-									exit={
-										prefersReducedMotion
-											? { opacity: 0 }
-											: { x: -32, opacity: 0, filter: 'blur(4px)' }
-									}
-									transition={{
-										duration: 0.14,
-										ease: 'easeInOut',
-										delay: CONTENT_SWAP_ENTER_DELAY
-									}}
-									className="absolute inset-0 flex w-full flex-col gap-[16px] p-[24px]"
-								>
-									<button
-										type="button"
-										onClick={closeMobileLocations}
-										className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-[14px] py-[10px] text-[12px] font-normal text-white transition-colors duration-200 ease-out hover:bg-[#0a2841]"
-									>
-										<svg
-											width="4"
-											height="6"
-											viewBox="0 0 4 6"
-											fill="none"
-											aria-hidden="true"
-											className="shrink-0"
-										>
-											<path
-												d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
-												fill="white"
-											/>
-										</svg>
-										Back
-									</button>
-									<div className="flex flex-1 flex-col gap-[2px] overflow-y-auto">
-										{renderLocationRows()}
-									</div>
-								</motion.div>
-							)}
-						</AnimatePresence>
-					</div>
-				</motion.div>
+									<path
+										d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
+										fill="white"
+									/>
+								</svg>
+								Back
+							</button>
+							<div className="flex flex-1 flex-col gap-[2px] overflow-y-auto">
+								{renderLocationRows()}
+							</div>
+						</motion.div>
+					) : mobileStep === 'card' && focusedLocation ? (
+						<motion.div
+							key="card"
+							custom={mobileStepDirection}
+							variants={mobilePageVariants}
+							initial="enter"
+							animate="center"
+							exit="exit"
+							transition={MOBILE_PANE_TRANSITION}
+							className="absolute inset-0 p-[11.5px] lg:hidden"
+						>
+							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
+						</motion.div>
+					) : null}
+				</AnimatePresence>
 			</main>
 		</div>
 	);

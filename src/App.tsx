@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+	startTransition,
+	useEffect,
+	useRef,
+	useState,
+	type KeyboardEvent,
+	type PointerEvent
+} from 'react';
 import { animate } from 'motion';
 import { AnimatePresence, motion } from 'motion/react';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
@@ -154,12 +161,21 @@ export default function App() {
 	const offsetXAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 	const offsetYAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 
+	// These onUpdate callbacks fire every animation frame for up to 0.5s, each
+	// forcing a full App re-render — that's already the cost of driving the
+	// globe's zoom through React state rather than a ref, but marking the
+	// update as a transition lets React deprioritize it behind more urgent
+	// work (a click handler, the next paint) instead of blocking the main
+	// thread every frame. That's what was dropping frames on transitions that
+	// start while a zoom tween from the previous step is still finishing —
+	// e.g. tapping "Back to map" while the deselect-triggered zoom-out from
+	// leaving the card is still running.
 	function animateScaleTo(target: number) {
 		scaleAnimationRef.current?.stop();
 		scaleAnimationRef.current = animate(scale, target, {
 			duration: 0.5,
 			ease: 'easeInOut',
-			onUpdate: (latest) => setScale(latest)
+			onUpdate: (latest) => startTransition(() => setScale(latest))
 		});
 	}
 
@@ -168,7 +184,7 @@ export default function App() {
 		offsetXAnimationRef.current = animate(offsetX, target, {
 			duration: 0.5,
 			ease: 'easeInOut',
-			onUpdate: (latest) => setOffsetX(latest)
+			onUpdate: (latest) => startTransition(() => setOffsetX(latest))
 		});
 	}
 
@@ -177,7 +193,7 @@ export default function App() {
 		offsetYAnimationRef.current = animate(offsetY, target, {
 			duration: 0.5,
 			ease: 'easeInOut',
-			onUpdate: (latest) => setOffsetY(latest)
+			onUpdate: (latest) => startTransition(() => setOffsetY(latest))
 		});
 	}
 

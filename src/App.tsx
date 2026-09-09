@@ -51,17 +51,6 @@ type MobileStep = 'globe' | 'list' | 'card';
 const MOBILE_STEP_ORDER: Record<MobileStep, number> = { globe: 0, list: 1, card: 2 };
 const MOBILE_PANE_TRANSITION = { duration: 0.14, ease: 'easeInOut' } as const;
 
-// Mobile-only: the list pane's scrollable rows fade out under the header/
-// footer gradient bands instead of cutting off abruptly at the scroll
-// container's own edge — these match those bands' own heights (the header's
-// exactly, 36px; the footer's approximately, since it also includes the
-// back button: 36px bottom padding + roughly the button's own rendered
-// height) so a row scrolling past looks like it's dissolving into the band,
-// not just fading to the pane's plain background right before it.
-const LIST_ROWS_TOP_FADE = 36;
-const LIST_ROWS_BOTTOM_FADE = 76;
-const LIST_ROWS_MASK_IMAGE = `linear-gradient(to bottom, transparent, black ${LIST_ROWS_TOP_FADE}px, black calc(100% - ${LIST_ROWS_BOTTOM_FADE}px), transparent)`;
-
 // Desktop-only: while a location is focused, the globe pans down so the
 // focused marker's rest position (dead-center, pre-offset, since focusing
 // rotates the marker to face the camera) lands near the bottom of the globe
@@ -554,86 +543,34 @@ export default function App() {
 							transition={MOBILE_PANE_TRANSITION}
 							className="absolute inset-0 flex w-full flex-col gap-[16px] p-[36px] lg:hidden"
 						>
-							{/* Mirrors the footer gradient below: a negative x/top
-							    margin cancels the pane's own 36px top/side padding so
-							    this bleeds to the card's true top edge and full width,
-							    with its own height coming purely from pt-[36px] (empty
-							    otherwise) — i.e. it spans exactly from the card's top
-							    edge down to where the scrollable list starts, same as
-							    the footer does from the bottom. z-0 for the same reason
-							    as the footer's: without an explicit stacking context
-							    here, -z-10 would resolve against whatever ancestor
-							    happens to be one at the time, which isn't stable across
-							    the pane's own enter/exit animation. */}
-							<div className="relative z-0 -mx-[36px] -mt-[36px] shrink-0 pt-[36px]">
-								<div
-									aria-hidden="true"
-									className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-black to-transparent"
-								/>
-							</div>
 							{/* min-h-0 overrides the flex item's default min-height:
 							    auto, which would otherwise let it grow past the pane's
 							    bottom edge (rather than scroll) since its content can
 							    exceed the available space — and <main>'s overflow-hidden
 							    would then hard-clip it instead of this scrolling. */}
-							<div
-								className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto"
-								style={{
-									WebkitMaskImage: LIST_ROWS_MASK_IMAGE,
-									maskImage: LIST_ROWS_MASK_IMAGE
-								}}
-							>
+							<div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
 								{renderLocationRows()}
 							</div>
-							{/* Negative x/bottom margins cancel the pane's own 36px
-							    padding on those sides, so the gradient below (inset-0
-							    within this footer) bleeds all the way to the card's true
-							    edges instead of stopping short at the padded content
-							    area — the matching px/pb restores the button's own
-							    position exactly where it was. Top gets no such
-							    treatment: the footer's top edge is exactly where the
-							    scrollable list above it ends, which is where the
-							    gradient should start fading in from, per the brief.
-							    z-0 (not just relative) makes this its own stacking
-							    context, so the gradient's -z-10 below is always resolved
-							    locally against it — without an explicit z-index here, the
-							    gradient's context depends on whether the *animated*
-							    list-pane ancestor currently has a live transform/opacity
-							    inline style (only true while Framer's transition is
-							    actually running), so the gradient would render correctly
-							    mid-transition but escape behind the whole card once it
-							    settles and that inline styling drops away. */}
-							<div className="relative z-0 -mx-[36px] -mb-[36px] shrink-0 px-[36px] pb-[36px]">
-								{/* z-index below the button (a plain, non-positioned
-								    element) so it paints as a backdrop behind it rather
-								    than over it — an absolutely positioned layer with no
-								    z-index would otherwise paint above in-flow content by
-								    default. */}
-								<div
+							<button
+								type="button"
+								onClick={closeMobileLocations}
+								className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#e6eaed] bg-[#f4f6f7] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#e6eaed]"
+							>
+								<svg
+									width="4"
+									height="6"
+									viewBox="0 0 4 6"
+									fill="none"
 									aria-hidden="true"
-									className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-black to-transparent"
-								/>
-								<button
-									type="button"
-									onClick={closeMobileLocations}
-									className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#e6eaed] bg-[#f4f6f7] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#e6eaed]"
+									className="shrink-0"
 								>
-									<svg
-										width="4"
-										height="6"
-										viewBox="0 0 4 6"
-										fill="none"
-										aria-hidden="true"
-										className="shrink-0"
-									>
-										<path
-											d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
-											fill="#041C2C"
-										/>
-									</svg>
-									Back to map
-								</button>
-							</div>
+									<path
+										d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
+										fill="#041C2C"
+									/>
+								</svg>
+								Back to map
+							</button>
 						</motion.div>
 					) : mobileStep === 'card' && focusedLocation ? (
 						<motion.div

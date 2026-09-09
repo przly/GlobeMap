@@ -51,6 +51,17 @@ type MobileStep = 'globe' | 'list' | 'card';
 const MOBILE_STEP_ORDER: Record<MobileStep, number> = { globe: 0, list: 1, card: 2 };
 const MOBILE_PANE_TRANSITION = { duration: 0.14, ease: 'easeInOut' } as const;
 
+// Mobile-only: the list pane's scrollable rows fade out under the header/
+// footer gradient bands instead of cutting off abruptly at the scroll
+// container's own edge — these match those bands' own heights (the header's
+// exactly, 36px; the footer's approximately, since it also includes the
+// back button: 36px bottom padding + roughly the button's own rendered
+// height) so a row scrolling past looks like it's dissolving into the band,
+// not just fading to the pane's plain background right before it.
+const LIST_ROWS_TOP_FADE = 36;
+const LIST_ROWS_BOTTOM_FADE = 76;
+const LIST_ROWS_MASK_IMAGE = `linear-gradient(to bottom, transparent, black ${LIST_ROWS_TOP_FADE}px, black calc(100% - ${LIST_ROWS_BOTTOM_FADE}px), transparent)`;
+
 // Desktop-only: while a location is focused, the globe pans down so the
 // focused marker's rest position (dead-center, pre-offset, since focusing
 // rotates the marker to face the camera) lands near the bottom of the globe
@@ -565,7 +576,13 @@ export default function App() {
 							    bottom edge (rather than scroll) since its content can
 							    exceed the available space — and <main>'s overflow-hidden
 							    would then hard-clip it instead of this scrolling. */}
-							<div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
+							<div
+								className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto"
+								style={{
+									WebkitMaskImage: LIST_ROWS_MASK_IMAGE,
+									maskImage: LIST_ROWS_MASK_IMAGE
+								}}
+							>
 								{renderLocationRows()}
 							</div>
 							{/* Negative x/bottom margins cancel the pane's own 36px

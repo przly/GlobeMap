@@ -60,7 +60,7 @@ export default function LocationInfoCard({ location }: Props) {
 								fill="#041C2C"
 							/>
 						</svg>
-						<span className="font-mono font-semibold tracking-[-0.24px]">has data center</span>
+						<span className="font-mono font-medium tracking-[-0.24px]">has data center</span>
 					</span>
 				) : null}
 			</div>

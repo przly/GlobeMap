@@ -113,7 +113,12 @@ export default function GlobeMarkerItem({
 						// wrapper-level hover effect would flash a shadow around
 						// the whole fading card — not just the pin — if the
 						// pointer is still sitting there from the click.
-						onSelect ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'
+						// No cursor-pointer here — the wrapper spans the whole
+						// pin+card group, but only the pin (its own cursor-pointer
+						// in App.tsx) and the card's "Visit website" link actually
+						// do anything on click; the rest of the card intentionally
+						// does nothing (its own onClick stops propagation).
+						onSelect ? 'pointer-events-auto' : 'pointer-events-none'
 					)}
 					style={tooltipStyle}
 					onClick={onSelect}

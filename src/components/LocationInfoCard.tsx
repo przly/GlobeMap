@@ -36,7 +36,7 @@ export default function LocationInfoCard({ location }: Props) {
 			// nothing instead of closing the tooltip. Only the pin or a genuine
 			// outside click (the globe background) closes it.
 			onClick={(event) => event.stopPropagation()}
-			className="flex w-[min(361px,calc(100vw-2rem))] flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
+			className="flex w-[min(361px,calc(100vw-2rem))] cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
 		>
 			<div className="flex w-full items-center justify-between">
 				<span

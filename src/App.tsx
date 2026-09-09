@@ -109,6 +109,17 @@ function usePrefersReducedMotion() {
 export default function App() {
 	const isDesktop = useIsDesktop();
 	const prefersReducedMotion = usePrefersReducedMotion();
+	// Mobile-only: the locations list renders in its own shell below the
+	// globe card (see the bottom of the JSX below) rather than inside it —
+	// this ref lets the "Explore locations" button scroll that shell into
+	// view instead of navigating anywhere.
+	const mobileLocationsRef = useRef<HTMLDivElement>(null);
+	function scrollToMobileLocations() {
+		mobileLocationsRef.current?.scrollIntoView({
+			behavior: prefersReducedMotion ? 'auto' : 'smooth',
+			block: 'start'
+		});
+	}
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
 	const defaultOffsetX = isDesktop ? 1 / 6 : 0;
@@ -387,6 +398,17 @@ export default function App() {
 						</span>
 					</button>
 				</div>
+
+				<button
+					type="button"
+					onClick={scrollToMobileLocations}
+					className="absolute right-8 bottom-8 inline-flex shrink-0 items-center gap-2 rounded-[9000px] border border-[#82e472] bg-[#44d62c] px-4 py-3 text-sm font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#3bc224] lg:hidden"
+				>
+					Explore locations
+					<span aria-hidden="true" className="text-sm leading-none">
+						→
+					</span>
+				</button>
 			</main>
 
 			{/* One persistent shell (border/rounded/bg) shared by the list and the
@@ -397,6 +419,7 @@ export default function App() {
 			    just appears normally on first load instead of sliding in from
 			    the left as if it had just "come back" from a card. */}
 			<div
+				ref={mobileLocationsRef}
 				className="relative w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden"
 				style={{ height: MOBILE_LIST_HEIGHT }}
 			>

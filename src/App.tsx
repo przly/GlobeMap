@@ -397,14 +397,18 @@ export default function App() {
 						'absolute inset-0',
 						mobileStep !== 'globe' && 'pointer-events-none lg:pointer-events-auto'
 					)}
+					// No blur here unlike the list/card panes' matching transition
+					// below: this pane wraps the live WebGL canvas plus its
+					// per-marker overlay, which the canvas already redraws (and
+					// React re-renders) every animation frame regardless of this
+					// transition — animating a CSS blur on top of that forces the
+					// browser to re-rasterize that whole layer every frame too,
+					// which is what was making this specific transition stutter.
+					// Transform + opacity alone stay GPU-composited without it.
 					animate={
 						prefersReducedMotion
 							? { opacity: mobileStep === 'globe' ? 1 : 0 }
-							: {
-									x: mobileStep === 'globe' ? 0 : -32,
-									opacity: mobileStep === 'globe' ? 1 : 0,
-									filter: mobileStep === 'globe' ? 'blur(0px)' : 'blur(4px)'
-								}
+							: { x: mobileStep === 'globe' ? 0 : -32, opacity: mobileStep === 'globe' ? 1 : 0 }
 					}
 					transition={MOBILE_PANE_TRANSITION}
 					aria-hidden={mobileStep !== 'globe'}

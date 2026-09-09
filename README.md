@@ -32,10 +32,14 @@ npm run lint      # prettier --check + eslint
 ```
 src/
   App.tsx                      reference page — canvas positioning per breakpoint lives here
-  components/globe/
-    Globe.tsx                  public component: sizes/positions the canvas, forwards props
-    GlobeScene.tsx             the WebGL renderer + gesture handling (self-contained, not for editing)
-    GlobeMarkerItem.tsx        marker pin + tooltip (self-contained, not for editing)
+  lib/locations.ts             location data + the LocationDetail type — CMS integration point, see below
+  components/
+    LocationInfoCard.tsx       the location info card/tooltip UI (desktop marker-anchored, mobile own block)
+    globe/
+      Globe.tsx                public component: sizes/positions the canvas, forwards props
+      GlobeScene.tsx           the WebGL renderer + gesture handling (self-contained, not for editing)
+      GlobeMarkerItem.tsx      marker pin + tooltip (self-contained, not for editing)
+  assets/flag-placeholder.svg  temporary shared flag image, see "Adding locations" below
 ```
 
 `<Globe />` itself is a fixed API surface — pass it `scale`, `markers`,
@@ -147,6 +151,11 @@ Things worth flagging to whoever wires this up:
   per-country flags yet. Once the CMS serves those, each location's own
   `countryFlag` should be its real flag URL — no rendering code changes
   needed, `PLACEHOLDER_FLAG` and its import can just be deleted.
+- **The flag renders at a fixed 22x16px**, not its own natural size —
+  `LocationInfoCard.tsx` hardcodes that box (matching the placeholder's own
+  dimensions, a standard ~3:2 flag ratio) with `object-cover`, so a CMS
+  flag asset with a noticeably different aspect ratio will get cropped to
+  fit. Worth flagging to whoever sources the real flag images.
 - **`kwhUnderManagement` is a pre-formatted string, not a number** — the CMS
   (or whatever feeds it) controls the unit and rounding (e.g. "0.9 GWh" vs
   "900 MWh"), the component just displays it as-is.

@@ -46,7 +46,7 @@ export default function LocationInfoCard({ location }: Props) {
 					{location.countryFlag}
 				</span>
 				{location.hasDataCenter ? (
-					<span className="inline-flex shrink-0 items-center gap-[6px] rounded-[6060px] border border-[#82e472] bg-[#44d62c] py-[8px] pr-[12px] pl-[8px] text-[12px] text-[#041c2c] uppercase">
+					<span className="inline-flex shrink-0 items-center gap-[6px] rounded-[6060px] border border-[#82e472] bg-[#44d62c] py-[8px] pr-[12px] pl-[8px] text-[12px] leading-none text-[#041c2c] uppercase">
 						<span aria-hidden="true" className="text-[12px] leading-none">
 							✓
 						</span>

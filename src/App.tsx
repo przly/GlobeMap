@@ -370,14 +370,20 @@ export default function App() {
 				className="w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden"
 				style={{ height: MOBILE_LIST_HEIGHT }}
 			>
+				{/* A small ±32px nudge + blur crossfade reads as a content swap
+				    inside the shell, not two full-width panels sliding past each
+				    other (that full-width slide left an awkward stretch of empty
+				    horizontal space mid-transition). Direction still mirrors:
+				    card enters from/exits back to the right, list enters from/
+				    exits back to the left. */}
 				<AnimatePresence mode="wait" initial={false}>
 					{focusedLocation ? (
 						<motion.div
 							key="card"
-							initial={{ x: '100%' }}
-							animate={{ x: 0 }}
-							exit={{ x: '100%' }}
-							transition={{ duration: 0.3, ease: 'easeInOut' }}
+							initial={{ x: 32, filter: 'blur(4px)' }}
+							animate={{ x: 0, filter: 'blur(0px)' }}
+							exit={{ x: 32, filter: 'blur(4px)' }}
+							transition={{ duration: 0.14, ease: 'easeInOut' }}
 							className="h-full"
 						>
 							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
@@ -385,10 +391,10 @@ export default function App() {
 					) : (
 						<motion.div
 							key="list"
-							initial={{ x: '-100%' }}
-							animate={{ x: 0 }}
-							exit={{ x: '-100%' }}
-							transition={{ duration: 0.3, ease: 'easeInOut' }}
+							initial={{ x: -32, filter: 'blur(4px)' }}
+							animate={{ x: 0, filter: 'blur(0px)' }}
+							exit={{ x: -32, filter: 'blur(4px)' }}
+							transition={{ duration: 0.14, ease: 'easeInOut' }}
 							className="flex w-full flex-col gap-[2px] p-[11.5px]"
 						>
 							{renderLocationRows()}

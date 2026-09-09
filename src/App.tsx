@@ -522,7 +522,12 @@ export default function App() {
 								</svg>
 								Back
 							</button>
-							<div className="flex flex-1 flex-col gap-[2px] overflow-y-auto">
+							{/* min-h-0 overrides the flex item's default min-height:
+							    auto, which would otherwise let it grow past the pane's
+							    bottom edge (rather than scroll) since its content can
+							    exceed the available space — and <main>'s overflow-hidden
+							    would then hard-clip it instead of this scrolling. */}
+							<div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
 								{renderLocationRows()}
 							</div>
 						</motion.div>

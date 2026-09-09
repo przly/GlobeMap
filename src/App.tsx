@@ -344,11 +344,14 @@ export default function App() {
 				</div>
 			</main>
 
-			{/* overflow-hidden clips the slide so it never causes horizontal page
-			    overflow; initial={false} on AnimatePresence means the list just
-			    appears normally on first load instead of sliding in from the
-			    left as if it had just "come back" from a card. */}
-			<div className="w-full overflow-hidden lg:hidden">
+			{/* One persistent shell (border/rounded/bg) shared by the list and the
+			    card — only the content inside slides, not the shell itself, so
+			    this never reads as two separate cards swapping places. Its own
+			    overflow-hidden clips the slide so it never causes horizontal
+			    page overflow; initial={false} on AnimatePresence means the list
+			    just appears normally on first load instead of sliding in from
+			    the left as if it had just "come back" from a card. */}
+			<div className="w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden">
 				<AnimatePresence mode="wait" initial={false}>
 					{focusedLocation ? (
 						<motion.div
@@ -357,7 +360,6 @@ export default function App() {
 							animate={{ x: 0 }}
 							exit={{ x: '100%' }}
 							transition={{ duration: 0.3, ease: 'easeInOut' }}
-							className="w-full"
 						>
 							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
 						</motion.div>
@@ -368,7 +370,7 @@ export default function App() {
 							animate={{ x: 0 }}
 							exit={{ x: '-100%' }}
 							transition={{ duration: 0.3, ease: 'easeInOut' }}
-							className="flex w-full flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px]"
+							className="flex w-full flex-col gap-[2px] p-[11.5px]"
 						>
 							{renderLocationRows()}
 						</motion.div>

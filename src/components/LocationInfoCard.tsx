@@ -30,9 +30,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function LocationInfoCard({ location, onBack }: Props) {
 	// onBack only exists for the mobile card (see App.tsx) — reused here as
-	// the signal to drop the blur-in/out and shadow, which read as redundant
-	// on mobile where the card already has its own slide transition and sits
-	// directly on the page instead of floating over the globe.
+	// the signal to drop the blur-in/out, shadow, and shell chrome (rounded
+	// corners, border, background), all of which read as redundant on
+	// mobile: the card already has its own slide transition, and renders
+	// "bare" content-only inside a single persistent shell shared with the
+	// locations list (so only the content swaps in place, not two separate
+	// cards both sliding) rather than floating over the globe with its own
+	// full card look.
 	const isMobile = Boolean(onBack);
 
 	return (
@@ -55,8 +59,8 @@ export default function LocationInfoCard({ location, onBack }: Props) {
 			// width exactly, which is responsive (fills the page's padded
 			// width), not a fixed pixel value.
 			className={cn(
-				'flex w-full cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px]',
-				isMobile ? '' : 'shadow-xl'
+				'flex w-full cursor-default flex-col gap-[32px] p-[24px]',
+				isMobile ? '' : 'rounded-[36px] border border-[#e6eaed] bg-white shadow-xl'
 			)}
 		>
 			{onBack ? (

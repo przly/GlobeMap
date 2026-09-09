@@ -139,9 +139,10 @@ export default function App() {
 			setOffsetY(defaultOffsetY);
 		}
 		// A resize onto the desktop breakpoint while mid-way through
-		// globe→list→card would otherwise leave the globe pane's -100% x
-		// offset in place (see mobileStep below), hiding the globe entirely
-		// on desktop, since that state isn't itself breakpoint-gated.
+		// globe→list→card would otherwise leave the globe pane's blurred,
+		// -32px, opacity-0 "inactive" state in place (see mobileStep below),
+		// hiding the globe on desktop, since that state isn't itself
+		// breakpoint-gated.
 		if (isDesktop) setIsMobileLocationsOpen(false);
 	}
 
@@ -210,11 +211,20 @@ export default function App() {
 	// this off the `custom` prop on their AnimatePresence below, which
 	// Framer forwards to the exiting pane too so the entering and exiting
 	// pane always agree on direction.
+	//
+	// mobileStepDirection itself has to be state, not a local computed on the
+	// fly from comparing mobileStep to prevMobileStep: setPrevMobileStep
+	// below forces React to immediately redo this render with the new
+	// prevMobileStep already in place, and on that redo mobileStep ===
+	// prevMobileStep, so a freshly-recomputed value would always collapse
+	// back to a hardcoded default instead of keeping whatever direction was
+	// just determined.
 	const [prevMobileStep, setPrevMobileStep] = useState<MobileStep>(mobileStep);
-	let mobileStepDirection: 1 | -1 = 1;
+	const [mobileStepDirection, setMobileStepDirection] = useState<1 | -1>(1);
 	if (mobileStep !== prevMobileStep) {
-		mobileStepDirection =
-			MOBILE_STEP_ORDER[mobileStep] > MOBILE_STEP_ORDER[prevMobileStep] ? 1 : -1;
+		setMobileStepDirection(
+			MOBILE_STEP_ORDER[mobileStep] > MOBILE_STEP_ORDER[prevMobileStep] ? 1 : -1
+		);
 		setPrevMobileStep(mobileStep);
 	}
 

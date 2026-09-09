@@ -36,29 +36,37 @@ export default function LocationInfoCard({ location }: Props) {
 			// nothing instead of closing the tooltip. Only the pin or a genuine
 			// outside click (the globe background) closes it.
 			onClick={(event) => event.stopPropagation()}
-			className="flex w-[min(361px,calc(100vw-2rem))] flex-col gap-[24px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
+			className="flex w-[min(361px,calc(100vw-2rem))] flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
 		>
-			<div className="flex w-full flex-col items-start gap-[24px]">
+			<div className="flex w-full items-center justify-between">
 				<span
 					className="flex size-[24px] shrink-0 items-center justify-center rounded-[4px] border-[0.5px] border-black/10 text-[14px] leading-none"
 					aria-hidden="true"
 				>
 					{location.countryFlag}
 				</span>
-				<div className="flex flex-col gap-[2px]">
-					<p className="font-['Inter'] text-[20px] leading-[1.2] font-medium tracking-[-0.4px] text-[#041c2c]">
-						{location.label}, {location.country}
-					</p>
-					<p className="font-['Inter'] text-[14px] leading-[1.5] font-normal text-[#7c868e]">
-						{location.company}
-					</p>
-				</div>
+				{location.hasDataCenter ? (
+					<span className="inline-flex shrink-0 items-center gap-[6px] rounded-[6060px] border border-[#82e472] bg-[#44d62c] py-[8px] pr-[12px] pl-[8px] text-[12px] text-[#041c2c] uppercase">
+						<span aria-hidden="true" className="text-[12px] leading-none">
+							✓
+						</span>
+						<span className="font-mono font-semibold tracking-[-0.24px]">has data center</span>
+					</span>
+				) : null}
+			</div>
+
+			<div className="flex flex-col gap-[2px]">
+				<p className="font-['Inter'] text-[20px] leading-[1.2] font-medium tracking-[-0.4px] text-[#041c2c]">
+					{location.label}, {location.country}
+				</p>
+				<p className="font-['Inter'] text-[14px] leading-[1.5] font-normal text-[#7c868e]">
+					{location.company}
+				</p>
 			</div>
 
 			<div className="flex w-full flex-col gap-[24px]">
 				<Stat label="established" value={String(location.establishedYear)} />
 				<Stat label="kWh under management" value={location.kwhUnderManagement} />
-				{location.hasDataCenter ? <Stat label="data center" value="Yes" /> : null}
 			</div>
 
 			<a

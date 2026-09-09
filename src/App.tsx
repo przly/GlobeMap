@@ -522,10 +522,18 @@ export default function App() {
 							transition={MOBILE_PANE_TRANSITION}
 							className="absolute inset-0 flex w-full flex-col gap-[16px] p-[36px] lg:hidden"
 						>
+							{/* min-h-0 overrides the flex item's default min-height:
+							    auto, which would otherwise let it grow past the pane's
+							    bottom edge (rather than scroll) since its content can
+							    exceed the available space — and <main>'s overflow-hidden
+							    would then hard-clip it instead of this scrolling. */}
+							<div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
+								{renderLocationRows()}
+							</div>
 							<button
 								type="button"
 								onClick={closeMobileLocations}
-								className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#42515d] bg-[#041c2c] px-[14px] py-[10px] text-[12px] font-normal text-white transition-colors duration-200 ease-out hover:bg-[#0a2841]"
+								className="inline-flex w-fit shrink-0 items-center gap-[6px] self-start rounded-[9000px] border border-[#e6eaed] bg-[#f4f6f7] px-[14px] py-[10px] text-[12px] font-normal text-[#041c2c] transition-colors duration-200 ease-out hover:bg-[#e6eaed]"
 							>
 								<svg
 									width="4"
@@ -537,19 +545,11 @@ export default function App() {
 								>
 									<path
 										d="M1.08828 2.8252L3.13828 4.8752C3.22995 4.96686 3.27578 5.0752 3.27578 5.2002C3.27578 5.31686 3.22995 5.42103 3.13828 5.5127C3.04661 5.60436 2.93828 5.6502 2.81328 5.6502C2.69661 5.6502 2.59245 5.60436 2.50078 5.5127L0.125781 3.1377C0.0841149 3.09603 0.0507816 3.0502 0.0257815 3.0002C0.00911486 2.94186 0.000781536 2.88353 0.000781536 2.8252C0.000781536 2.76686 0.00911486 2.7127 0.0257815 2.66269C0.0507816 2.60436 0.0841149 2.55436 0.125781 2.5127L2.50078 0.137695C2.59245 0.0460281 2.69661 0.000194788 2.81328 0.000194788C2.93828 0.000194788 3.04661 0.0460281 3.13828 0.137695C3.22995 0.229362 3.27578 0.337695 3.27578 0.462695C3.27578 0.579362 3.22995 0.683528 3.13828 0.775195L1.08828 2.8252Z"
-										fill="white"
+										fill="#041C2C"
 									/>
 								</svg>
 								Back to map
 							</button>
-							{/* min-h-0 overrides the flex item's default min-height:
-							    auto, which would otherwise let it grow past the pane's
-							    bottom edge (rather than scroll) since its content can
-							    exceed the available space — and <main>'s overflow-hidden
-							    would then hard-clip it instead of this scrolling. */}
-							<div className="flex min-h-0 flex-1 flex-col gap-[2px] overflow-y-auto">
-								{renderLocationRows()}
-							</div>
 						</motion.div>
 					) : mobileStep === 'card' && focusedLocation ? (
 						<motion.div

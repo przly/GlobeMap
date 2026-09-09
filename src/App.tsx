@@ -48,6 +48,13 @@ const MOBILE_LIST_HEIGHT =
 	(locations.length - 1) * MOBILE_LIST_ROW_GAP +
 	MOBILE_LIST_PADDING * 2;
 
+// Mobile-only: the list<->card content swap uses AnimatePresence's default
+// sync mode (enter and exit run together, not one after the other), so
+// there's no gap to delay the enter for — kept as an explicit named
+// constant rather than just omitting `delay` so that intent reads clearly
+// at the call site.
+const CONTENT_SWAP_ENTER_DELAY = 0;
+
 // Desktop-only: while a location is focused, the globe pans down so the
 // focused marker's rest position (dead-center, pre-offset, since focusing
 // rotates the marker to face the camera) lands near the bottom of the globe
@@ -81,8 +88,27 @@ function useIsDesktop() {
 	return isDesktop;
 }
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function usePrefersReducedMotion() {
+	const [prefersReducedMotion, setPrefersReducedMotion] = useState(() =>
+		typeof window === 'undefined' ? false : window.matchMedia(REDUCED_MOTION_QUERY).matches
+	);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+		const onChange = () => setPrefersReducedMotion(mediaQuery.matches);
+		onChange();
+		mediaQuery.addEventListener('change', onChange);
+		return () => mediaQuery.removeEventListener('change', onChange);
+	}, []);
+
+	return prefersReducedMotion;
+}
+
 export default function App() {
 	const isDesktop = useIsDesktop();
+	const prefersReducedMotion = usePrefersReducedMotion();
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
 	const defaultOffsetX = isDesktop ? 1 / 6 : 0;
@@ -367,35 +393,45 @@ export default function App() {
 			    just appears normally on first load instead of sliding in from
 			    the left as if it had just "come back" from a card. */}
 			<div
-				className="w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden"
+				className="relative w-full overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white lg:hidden"
 				style={{ height: MOBILE_LIST_HEIGHT }}
 			>
-				{/* A small ±32px nudge + blur crossfade reads as a content swap
+				{/* Default sync AnimatePresence mode (no mode="wait"), so the
+				    outgoing and incoming content fully overlap instead of one
+				    waiting for the other to finish — CONTENT_SWAP_ENTER_DELAY is
+				    0, i.e. the enter animation starts the instant the exit does.
+				    Both are absolutely positioned within this relative, fixed-
+				    height shell so they can overlap without a layout jump. A
+				    small ±32px nudge + blur crossfade reads as a content swap
 				    inside the shell, not two full-width panels sliding past each
-				    other (that full-width slide left an awkward stretch of empty
-				    horizontal space mid-transition). Direction still mirrors:
-				    card enters from/exits back to the right, list enters from/
-				    exits back to the left. */}
-				<AnimatePresence mode="wait" initial={false}>
+				    other. Direction still mirrors: card enters from/exits back
+				    to the right, list enters from/exits back to the left.
+				    prefers-reduced-motion drops the slide and blur, keeping only
+				    the opacity crossfade. */}
+				<AnimatePresence initial={false}>
 					{focusedLocation ? (
 						<motion.div
 							key="card"
-							initial={{ x: 32, filter: 'blur(4px)' }}
-							animate={{ x: 0, filter: 'blur(0px)' }}
-							exit={{ x: 32, filter: 'blur(4px)' }}
-							transition={{ duration: 0.14, ease: 'easeInOut' }}
-							className="h-full"
+							initial={
+								prefersReducedMotion ? { opacity: 0 } : { x: 32, opacity: 0, filter: 'blur(4px)' }
+							}
+							animate={prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' }}
+							exit={prefersReducedMotion ? { opacity: 0 } : { x: 32, opacity: 0, filter: 'blur(4px)' }}
+							transition={{ duration: 0.14, ease: 'easeInOut', delay: CONTENT_SWAP_ENTER_DELAY }}
+							className="absolute inset-0"
 						>
 							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
 						</motion.div>
 					) : (
 						<motion.div
 							key="list"
-							initial={{ x: -32, filter: 'blur(4px)' }}
-							animate={{ x: 0, filter: 'blur(0px)' }}
-							exit={{ x: -32, filter: 'blur(4px)' }}
-							transition={{ duration: 0.14, ease: 'easeInOut' }}
-							className="flex w-full flex-col gap-[2px] p-[11.5px]"
+							initial={
+								prefersReducedMotion ? { opacity: 0 } : { x: -32, opacity: 0, filter: 'blur(4px)' }
+							}
+							animate={prefersReducedMotion ? { opacity: 1 } : { x: 0, opacity: 1, filter: 'blur(0px)' }}
+							exit={prefersReducedMotion ? { opacity: 0 } : { x: -32, opacity: 0, filter: 'blur(4px)' }}
+							transition={{ duration: 0.14, ease: 'easeInOut', delay: CONTENT_SWAP_ENTER_DELAY }}
+							className="absolute inset-0 flex w-full flex-col gap-[2px] p-[11.5px]"
 						>
 							{renderLocationRows()}
 						</motion.div>

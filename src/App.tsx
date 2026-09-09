@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { animate } from 'motion';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
 import LocationInfoCard from './components/LocationInfoCard';
 import { cn } from './lib/cn';
@@ -137,6 +137,12 @@ export default function App() {
 		color: '#041c2c',
 		size: markerSize
 	}));
+
+	// Mobile-only: drives the list <-> card push/pop swap under the globe
+	// card (see the JSX below) instead of the marker-tooltip system used on
+	// desktop (isDesktop-gated here so the two never both render the card).
+	const focusedLocation =
+		focusOn && !isDesktop ? locations.find((loc) => isFocused(focusOn, loc.location)) : undefined;
 
 	function selectLocation(location: [number, number]) {
 		const nextFocus = isFocused(focusOn, location) ? null : location;
@@ -330,8 +336,35 @@ export default function App() {
 				</div>
 			</main>
 
-			<div className="flex w-full flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px] lg:hidden">
-				{renderLocationRows()}
+			{/* overflow-hidden clips the slide so it never causes horizontal page
+			    overflow; initial={false} on AnimatePresence means the list just
+			    appears normally on first load instead of sliding in from the
+			    left as if it had just "come back" from a card. */}
+			<div className="w-full overflow-hidden lg:hidden">
+				<AnimatePresence mode="wait" initial={false}>
+					{focusedLocation ? (
+						<motion.div
+							key="card"
+							initial={{ x: '100%' }}
+							animate={{ x: 0 }}
+							exit={{ x: '100%' }}
+							transition={{ duration: 0.3, ease: 'easeInOut' }}
+						>
+							<LocationInfoCard location={focusedLocation} onBack={deselectLocation} />
+						</motion.div>
+					) : (
+						<motion.div
+							key="list"
+							initial={{ x: '-100%' }}
+							animate={{ x: 0 }}
+							exit={{ x: '-100%' }}
+							transition={{ duration: 0.3, ease: 'easeInOut' }}
+							className="flex w-full flex-col gap-[2px] overflow-hidden rounded-[36px] border-[0.5px] border-[#e6eaed] bg-white p-[11.5px]"
+						>
+							{renderLocationRows()}
+						</motion.div>
+					)}
+				</AnimatePresence>
 			</div>
 		</div>
 	);

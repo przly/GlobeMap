@@ -3,6 +3,12 @@ import type { LocationDetail } from '../lib/locations';
 
 interface Props {
 	location: LocationDetail;
+	/**
+	 * Mobile-only: renders a "Back" control at the top of the card and calls
+	 * this when pressed, instead of relying on a pin/background click to
+	 * deselect (the mobile card isn't anchored to a pin — see App.tsx).
+	 */
+	onBack?: () => void;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -21,7 +27,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 	);
 }
 
-export default function LocationInfoCard({ location }: Props) {
+export default function LocationInfoCard({ location, onBack }: Props) {
 	return (
 		<motion.div
 			initial={{ opacity: 0, filter: 'blur(16px)' }}
@@ -38,6 +44,22 @@ export default function LocationInfoCard({ location }: Props) {
 			onClick={(event) => event.stopPropagation()}
 			className="flex w-[min(361px,calc(100vw-2rem))] cursor-default flex-col gap-[32px] rounded-[36px] border border-[#e6eaed] bg-white p-[24px] shadow-xl"
 		>
+			{onBack ? (
+				<button
+					type="button"
+					onClick={(event) => {
+						event.stopPropagation();
+						onBack();
+					}}
+					className="-ml-[6px] inline-flex w-fit shrink-0 cursor-pointer items-center gap-[6px] self-start rounded-[9000px] py-[6px] pr-[10px] pl-[6px] text-[13px] font-medium text-[#7c868e] transition-colors duration-200 ease-out hover:bg-[#f4f6f7] hover:text-[#041c2c]"
+				>
+					<span aria-hidden="true" className="text-[13px] leading-none">
+						←
+					</span>
+					Back
+				</button>
+			) : null}
+
 			<div className="flex w-full items-center justify-between">
 				<span
 					className="flex size-[24px] shrink-0 items-center justify-center rounded-[4px] border-[0.5px] border-black/10 text-[14px] leading-none"

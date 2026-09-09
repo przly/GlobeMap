@@ -42,6 +42,12 @@ const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 // pin+card group's actual rendered height.
 const DESKTOP_FOCUS_OFFSET_Y = -0.36;
 
+// Desktop-only: while a location is focused, the globe also pans left (a
+// smaller offsetX than the default 1/6) so the pin+card group's rest
+// position sits further toward the left of the globe card instead of at
+// its default, more-right-of-center spot.
+const DESKTOP_FOCUS_OFFSET_X = 1 / 6 - 0.1;
+
 // The globe's offsetX is a shader uniform, not a CSS value, so it can't be
 // gated behind a Tailwind breakpoint — it needs to be read from JS instead.
 function useIsDesktop() {
@@ -64,7 +70,8 @@ export default function App() {
 	const isDesktop = useIsDesktop();
 	const defaultScale = isDesktop ? DESKTOP_DEFAULT_SCALE : MOBILE_DEFAULT_SCALE;
 	const focusScale = isDesktop ? DESKTOP_FOCUS_SCALE : MOBILE_FOCUS_SCALE;
-	const offsetX = isDesktop ? 1 / 6 : 0;
+	const defaultOffsetX = isDesktop ? 1 / 6 : 0;
+	const [offsetX, setOffsetX] = useState(defaultOffsetX);
 	const defaultOffsetY = isDesktop ? 0 : MOBILE_OFFSET_Y;
 	const [offsetY, setOffsetY] = useState(defaultOffsetY);
 	const [scale, setScale] = useState(defaultScale);
@@ -84,6 +91,7 @@ export default function App() {
 		setPrevIsDesktop(isDesktop);
 		if (!focusOn) {
 			setScale(defaultScale);
+			setOffsetX(defaultOffsetX);
 			setOffsetY(defaultOffsetY);
 		}
 	}
@@ -93,6 +101,7 @@ export default function App() {
 	const markerSize = baseMarkerSize * (defaultScale / scale);
 
 	const scaleAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
+	const offsetXAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 	const offsetYAnimationRef = useRef<ReturnType<typeof animate> | null>(null);
 
 	function animateScaleTo(target: number) {
@@ -101,6 +110,15 @@ export default function App() {
 			duration: 0.5,
 			ease: 'easeInOut',
 			onUpdate: (latest) => setScale(latest)
+		});
+	}
+
+	function animateOffsetXTo(target: number) {
+		offsetXAnimationRef.current?.stop();
+		offsetXAnimationRef.current = animate(offsetX, target, {
+			duration: 0.5,
+			ease: 'easeInOut',
+			onUpdate: (latest) => setOffsetX(latest)
 		});
 	}
 
@@ -125,7 +143,10 @@ export default function App() {
 		setFocusOn(nextFocus);
 		setIsDoubleTapZoomed(false);
 		animateScaleTo(nextFocus ? focusScale : defaultScale);
-		if (isDesktop) animateOffsetYTo(nextFocus ? DESKTOP_FOCUS_OFFSET_Y : defaultOffsetY);
+		if (isDesktop) {
+			animateOffsetXTo(nextFocus ? DESKTOP_FOCUS_OFFSET_X : defaultOffsetX);
+			animateOffsetYTo(nextFocus ? DESKTOP_FOCUS_OFFSET_Y : defaultOffsetY);
+		}
 	}
 
 	function deselectLocation() {
@@ -133,7 +154,10 @@ export default function App() {
 		setFocusOn(null);
 		setIsDoubleTapZoomed(false);
 		animateScaleTo(defaultScale);
-		if (isDesktop) animateOffsetYTo(defaultOffsetY);
+		if (isDesktop) {
+			animateOffsetXTo(defaultOffsetX);
+			animateOffsetYTo(defaultOffsetY);
+		}
 	}
 
 	// Mobile-only (see the Globe element below): double-tapping empty globe

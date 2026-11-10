@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Globe, type GlobeMarker, type GlobeMarkerTooltipContext } from './components/globe';
 import { Kbd } from './components/Kbd';
 import { PinsPanel } from './components/PinsPanel';
@@ -7,6 +7,7 @@ import { cn } from './lib/cn';
 import { LABEL_STYLE } from './lib/controlStyles';
 import { usePinsEditor, type PinsEditor } from './lib/pinsEditor';
 import { locations } from './lib/locations';
+import { hasSeenIntro } from './lib/previewIntro';
 
 // Bare preview of the root route's globe: same globe, same pins, at exactly
 // the on-screen size it has inside App's card — but uncropped, centered in
@@ -45,11 +46,13 @@ function useIsDesktop() {
 const toMarkers = (pins: PinsEditor['pins']): GlobeMarker[] =>
 	pins.map(({ label, location }) => ({ location, label, color: '#041c2c', size: MARKER_SIZE }));
 
-// Toggles the pins panel. A bare key (no modifier) so it's one keystroke
-// before a screen capture — and so it doesn't fire while typing a pin name
-// containing an "h", it's ignored whenever a text field has focus (Escape
-// leaves the field first).
+// Page shortcuts: H toggles the pins panel, I opens the instructions
+// dialog. Bare keys (no modifier) so hiding the panel is one keystroke
+// before a screen capture — and so they don't fire while typing a pin name
+// containing an "h" or "i", they're ignored whenever a text field has focus
+// (Escape leaves the field first).
 const TOGGLE_PANEL_KEY = 'h';
+const OPEN_INSTRUCTIONS_KEY = 'i';
 
 function isTypingTarget(target: EventTarget | null) {
 	return (
@@ -58,28 +61,41 @@ function isTypingTarget(target: EventTarget | null) {
 	);
 }
 
-function usePanelToggleShortcut() {
-	const [isPanelOpen, setIsPanelOpen] = useState(true);
+function usePreviewShortcuts({
+	onTogglePanel,
+	onOpenInstructions
+}: {
+	onTogglePanel: () => void;
+	onOpenInstructions: () => void;
+}) {
+	// Read through a ref so the listener is attached once, not on every render.
+	const handlersRef = useRef({ onTogglePanel, onOpenInstructions });
+	useEffect(() => {
+		handlersRef.current = { onTogglePanel, onOpenInstructions };
+	});
 
 	useEffect(() => {
 		function onKeyDown(event: KeyboardEvent) {
-			// The first-visit intro dialog is modal — leave its keys alone.
+			// The instructions dialog is modal — leave its keys alone.
 			if (document.querySelector('dialog[open]')) return;
 			if (event.key === 'Escape' && isTypingTarget(event.target)) {
 				(event.target as HTMLElement).blur();
 				return;
 			}
-			if (event.key.toLowerCase() !== TOGGLE_PANEL_KEY) return;
 			if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
 			if (isTypingTarget(event.target)) return;
-			event.preventDefault();
-			setIsPanelOpen((open) => !open);
+			const key = event.key.toLowerCase();
+			if (key === TOGGLE_PANEL_KEY) {
+				event.preventDefault();
+				handlersRef.current.onTogglePanel();
+			} else if (key === OPEN_INSTRUCTIONS_KEY) {
+				event.preventDefault();
+				handlersRef.current.onOpenInstructions();
+			}
 		}
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
 	}, []);
-
-	return isPanelOpen;
 }
 
 // Same pill as App's unfocused marker tooltip, minus the hover/press states.
@@ -95,7 +111,12 @@ function renderMarkerTooltip({ marker }: GlobeMarkerTooltipContext) {
 export default function PreviewPage() {
 	const isDesktop = useIsDesktop();
 	const pinsEditor = usePinsEditor(locations);
-	const isPanelOpen = usePanelToggleShortcut();
+	const [isPanelOpen, setIsPanelOpen] = useState(true);
+	const [isInstructionsOpen, setIsInstructionsOpen] = useState(() => !hasSeenIntro());
+	usePreviewShortcuts({
+		onTogglePanel: () => setIsPanelOpen((open) => !open),
+		onOpenInstructions: () => setIsInstructionsOpen(true)
+	});
 
 	return (
 		// The canvas can be wider/taller than the viewport (the globe itself
@@ -128,13 +149,13 @@ export default function PreviewPage() {
 					className="absolute top-4 left-4 max-h-[calc(100dvh-32px)] max-w-[calc(100vw-32px)] overflow-y-auto lg:top-[36px] lg:left-[36px]"
 					footer={
 						<span className={cn(LABEL_STYLE, 'text-center')}>
-							Press <Kbd>H</Kbd> to hide / show this panel
+							Press <Kbd>H</Kbd> to hide / show this panel, <Kbd>I</Kbd> for instructions
 						</span>
 					}
 				/>
 			) : null}
 
-			<PreviewIntroDialog />
+			<PreviewIntroDialog open={isInstructionsOpen} onClose={() => setIsInstructionsOpen(false)} />
 		</div>
 	);
 }

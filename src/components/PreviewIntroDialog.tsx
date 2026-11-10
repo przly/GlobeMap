@@ -1,47 +1,30 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { markIntroSeen } from '../lib/previewIntro';
 import { Kbd } from './Kbd';
 
-// Remembered per browser, so the intro shows only on the first visit.
-// Storage can be unavailable (private windows, blocked site data) — then it
-// just shows on every visit instead of breaking the page.
-const STORAGE_KEY = 'globe:preview-intro-seen';
-
-function hasSeenIntro() {
-	try {
-		return window.localStorage.getItem(STORAGE_KEY) === '1';
-	} catch {
-		return false;
-	}
-}
-
-function markIntroSeen() {
-	try {
-		window.localStorage.setItem(STORAGE_KEY, '1');
-	} catch {
-		// Ignore — see STORAGE_KEY.
-	}
-}
-
-// First-visit instructions for /preview's pins panel. A native modal
-// <dialog> so focus is trapped inside it and the page behind is inert
-// while it's open; Escape dismisses it the same as the button does.
-export function PreviewIntroDialog() {
+// Instructions for /preview's pins panel: opens by itself on the first
+// visit and again whenever I is pressed (open state lives in PreviewPage).
+// A native modal <dialog> so focus is trapped inside it and the page behind
+// is inert while it's open; Escape dismisses it the same as the button does.
+export function PreviewIntroDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
 	const dialogRef = useRef<HTMLDialogElement>(null);
-	const [isOpen] = useState(() => !hasSeenIntro());
 
 	useEffect(() => {
-		// The .open check matters under StrictMode's double effect run:
+		// The .open checks matter under StrictMode's double effect run:
 		// showModal() on an already-open dialog throws.
 		const dialog = dialogRef.current;
-		if (isOpen && dialog && !dialog.open) dialog.showModal();
-	}, [isOpen]);
-
-	if (!isOpen) return null;
+		if (!dialog) return;
+		if (open && !dialog.open) dialog.showModal();
+		if (!open && dialog.open) dialog.close();
+	}, [open]);
 
 	return (
 		<dialog
 			ref={dialogRef}
-			onClose={markIntroSeen}
+			onClose={() => {
+				markIntroSeen();
+				onClose();
+			}}
 			aria-labelledby="preview-intro-title"
 			className="m-auto w-[min(400px,calc(100vw-32px))] rounded-[24px] border-[0.5px] border-[#e6eaed] bg-white p-6 text-[#041c2c] shadow-lg backdrop:bg-[#041c2c]/30 backdrop:backdrop-blur-[2px]"
 		>
@@ -56,7 +39,8 @@ export function PreviewIntroDialog() {
 				<Step n={1}>
 					In the <strong className="font-medium text-[#041c2c]">Pins</strong> panel, switch from
 					Existing to <strong className="font-medium text-[#041c2c]">Custom</strong>, or to{' '}
-					<strong className="font-medium text-[#041c2c]">None</strong> for a globe without pins.
+					<strong className="font-medium text-[#041c2c]">None</strong> to hide all the location
+					pins.
 				</Step>
 				<Step n={2}>
 					Enter a name, latitude and longitude. The pin shows on the globe once all three are filled
@@ -69,6 +53,9 @@ export function PreviewIntroDialog() {
 				<Step n={4}>
 					Press <Kbd>H</Kbd> to hide or show the panel. If you're typing in a field, press{' '}
 					<Kbd>Esc</Kbd> first.
+				</Step>
+				<Step n={5}>
+					Press <Kbd>I</Kbd> at any time to open these instructions again.
 				</Step>
 			</ol>
 

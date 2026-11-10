@@ -1,7 +1,9 @@
-import type { ComponentPropsWithoutRef } from 'react';
-import GlobeScene from './GlobeScene';
+import { forwardRef, type ComponentPropsWithoutRef } from 'react';
+import GlobeScene, { type GlobeSceneHandle } from './GlobeScene';
 import { cn } from '../../lib/cn';
 import type { GlobeMarker, GlobeMarkerTooltipRenderer } from './types';
+
+export type { GlobeSceneHandle as GlobeHandle };
 
 type SceneProps = ComponentPropsWithoutRef<typeof GlobeScene>;
 
@@ -62,6 +64,11 @@ interface Props extends Omit<ComponentPropsWithoutRef<'div'>, 'className'> {
 	 */
 	autoRotate?: SceneProps['autoRotate'];
 	/**
+	 * Multiplier applied to the base auto-rotate speed.
+	 * @default 1
+	 */
+	autoRotateSpeed?: SceneProps['autoRotateSpeed'];
+	/**
 	 * Whether to lock the camera's polar angle (vertical rotation).
 	 * If true, limits the vertical view to a narrow band.
 	 * @default true
@@ -108,28 +115,32 @@ interface Props extends Omit<ComponentPropsWithoutRef<'div'>, 'className'> {
 	active?: SceneProps['active'];
 }
 
-export default function Globe({
-	className = '',
-	scale = 1,
-	offsetX = 0,
-	offsetY = 0,
-	rotation = 0,
-	axialTilt = 0,
-	fresnelConfig,
-	pointCount,
-	landPointColor,
-	pointSize,
-	autoRotate = true,
-	lockedPolarAngle = true,
-	markers = [],
-	markerTooltip,
-	onMarkerClick,
-	onBackgroundClick,
-	onDoubleTap,
-	focusOn = null,
-	active = true,
-	...rest
-}: Props) {
+const Globe = forwardRef<GlobeSceneHandle, Props>(function Globe(
+	{
+		className = '',
+		scale = 1,
+		offsetX = 0,
+		offsetY = 0,
+		rotation = 0,
+		axialTilt = 0,
+		fresnelConfig,
+		pointCount,
+		landPointColor,
+		pointSize,
+		autoRotate = true,
+		autoRotateSpeed,
+		lockedPolarAngle = true,
+		markers = [],
+		markerTooltip,
+		onMarkerClick,
+		onBackgroundClick,
+		onDoubleTap,
+		focusOn = null,
+		active = true,
+		...rest
+	}: Props,
+	ref
+) {
 	return (
 		<div className={cn('relative h-full w-full overflow-hidden', className)} {...rest}>
 			{/* z-0 establishes a stacking context that contains the whole globe
@@ -139,6 +150,7 @@ export default function Globe({
 			    rendering under the cards instead of over them. */}
 			<div className="absolute inset-0 z-0">
 				<GlobeScene
+					ref={ref}
 					scale={scale}
 					offsetX={offsetX}
 					offsetY={offsetY}
@@ -149,6 +161,7 @@ export default function Globe({
 					landPointColor={landPointColor}
 					pointSize={pointSize}
 					autoRotate={autoRotate}
+					autoRotateSpeed={autoRotateSpeed}
 					lockedPolarAngle={lockedPolarAngle}
 					markers={markers}
 					markerTooltip={markerTooltip}
@@ -161,4 +174,8 @@ export default function Globe({
 			</div>
 		</div>
 	);
-}
+});
+
+Globe.displayName = 'Globe';
+
+export default Globe;

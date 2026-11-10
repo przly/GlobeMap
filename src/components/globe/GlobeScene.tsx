@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Camera, Mesh, Program, Renderer, Texture, Transform, Triangle, Vec2, Vec3 } from 'ogl';
 import { animate } from 'motion';
 import landTextureUrl from '../../assets/land-texture.png';
@@ -76,6 +76,13 @@ interface Props {
 	 */
 	autoRotate?: boolean;
 	/**
+	 * Multiplier applied to the base auto-rotate speed. 1 is the default
+	 * speed, 0 holds still (equivalent to autoRotate=false), 2 spins twice
+	 * as fast, etc. Negative values reverse the spin direction.
+	 * @default 1
+	 */
+	autoRotateSpeed?: number;
+	/**
 	 * Whether to lock the camera's polar angle.
 	 * @default true
 	 */
@@ -128,6 +135,24 @@ interface Props {
 	active?: boolean;
 }
 
+export interface GlobeSceneHandle {
+	/**
+	 * Records exactly one full 360° rotation of the globe (from whatever
+	 * angle it's currently facing) as a 4K/60fps video and downloads it.
+	 * Runs its own deterministic rotation sweep, independent of the
+	 * `autoRotate`/`autoRotateSpeed` props — those keep driving the live
+	 * on-screen view, this drives a separate, fixed-duration capture. Spins
+	 * through one full unrecorded "warm-up" lap first — settling the GL
+	 * viewport resize, shader/driver warm-up, and browser compositor onto
+	 * the new 4K canvas — before recording starts on the second lap, so the
+	 * recording itself isn't the one absorbing that first-frame jank.
+	 * Resolves with the recorded Blob once the download has been triggered.
+	 */
+	exportRotationVideo: (options?: {
+		onProgress?: (progress: { phase: 'warmup' | 'recording'; fraction: number }) => void;
+	}) => Promise<Blob>;
+}
+
 interface ProjectedMarker {
 	marker: GlobeMarker;
 	index: number;
@@ -172,6 +197,22 @@ const FOCUS_TWEEN_EASE = 'easeInOut';
 // double-tap rather than two separate taps.
 const DOUBLE_TAP_MAX_INTERVAL_MS = 300;
 const DOUBLE_TAP_MAX_DISTANCE = 24;
+
+// exportRotationVideo's fixed deliverable spec — one full 360° turntable
+// clip at UHD, up to 60fps, independent of the live canvas's on-screen size
+// or the interactive Rotation Speed slider. There's no fixed frame rate
+// constant to target: each frame is captured (via requestFrame(), see
+// exportRotationVideo) exactly once it's actually ready, so real-time
+// rendering that dips below 60fps yields fewer genuine frames that second
+// rather than padding the gap with stale duplicates.
+const EXPORT_WIDTH = 3840;
+const EXPORT_HEIGHT = 2160;
+const EXPORT_DURATION_SECONDS = 10;
+// See recordingBoundaryPhi in exportRotationVideo for why the recording
+// starts with this many seconds held frozen before the globe turns.
+const RECORDING_RAMP_IN_SECONDS = 0.5;
+const EXPORT_VIDEO_BITS_PER_SECOND = 40_000_000;
+const EXPORT_MIME_CANDIDATES = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
 
 const defaultFresnelConfig: Required<FresnelConfig> = {
 	color: '#17181A',
@@ -304,28 +345,55 @@ function applyDisplayTransform(
 	};
 }
 
-export default function GlobeScene({
-	scale = 1,
-	offsetX = 0,
-	offsetY = 0,
-	rotation = 0,
-	axialTilt = 0,
-	fresnelConfig = {},
-	pointCount = 15000,
-	pointSize = 0.05,
-	landPointColor = '#f77114',
-	autoRotate = true,
-	lockedPolarAngle = true,
-	markers = [],
-	markerTooltip,
-	onMarkerClick,
-	onBackgroundClick,
-	onDoubleTap,
-	focusOn = null,
-	active = true
-}: Props) {
+const GlobeScene = forwardRef<GlobeSceneHandle, Props>(function GlobeScene(
+	{
+		scale = 1,
+		offsetX = 0,
+		offsetY = 0,
+		rotation = 0,
+		axialTilt = 0,
+		fresnelConfig = {},
+		pointCount = 15000,
+		pointSize = 0.05,
+		landPointColor = '#f77114',
+		autoRotate = true,
+		autoRotateSpeed = 1,
+		lockedPolarAngle = true,
+		markers = [],
+		markerTooltip,
+		onMarkerClick,
+		onBackgroundClick,
+		onDoubleTap,
+		focusOn = null,
+		active = true
+	}: Props,
+	ref
+) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [projectedMarkers, setProjectedMarkers] = useState<ProjectedMarker[]>([]);
+	// Mirrors `projectedMarkers` state but reads synchronously — the export
+	// loop below runs outside React's render cycle and needs each frame's
+	// freshly-projected marker positions the instant syncMarkers computes
+	// them, not on React's next render.
+	const projectedMarkersRef = useRef<ProjectedMarker[]>([]);
+	// True for the duration of exportRotationVideo — the live tick() loop
+	// checks this and skips its own rendering entirely so it can't race
+	// with the export's own render/resize calls on the same canvas.
+	const exportActiveRef = useRef(false);
+	const exportRotationVideoRef = useRef<GlobeSceneHandle['exportRotationVideo'] | null>(null);
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			exportRotationVideo: async (options) => {
+				if (!exportRotationVideoRef.current) {
+					throw new Error('Globe is not ready yet.');
+				}
+				return exportRotationVideoRef.current(options);
+			}
+		}),
+		[]
+	);
 
 	const resolvedFresnelConfig: Required<FresnelConfig> = useMemo(
 		() => ({
@@ -350,6 +418,7 @@ export default function GlobeScene({
 		axialTilt,
 		lockedPolarAngle,
 		autoRotate,
+		autoRotateSpeed,
 		markers,
 		onBackgroundClick,
 		onDoubleTap,
@@ -364,6 +433,7 @@ export default function GlobeScene({
 			axialTilt,
 			lockedPolarAngle,
 			autoRotate,
+			autoRotateSpeed,
 			markers,
 			onBackgroundClick,
 			onDoubleTap,
@@ -862,6 +932,7 @@ export default function GlobeScene({
 				markerColorData[markerColorOffset + 2] = b;
 			}
 
+			projectedMarkersRef.current = nextMarkers;
 			setProjectedMarkers(nextMarkers);
 		};
 
@@ -1031,6 +1102,15 @@ export default function GlobeScene({
 		let raf = 0;
 		let previous = 0;
 		const tick = (now: number) => {
+			// A video export owns the canvas/renderer/rotation state for its
+			// own deterministic render loop (see exportRotationVideo below) —
+			// the live loop just idles rather than fighting it for the same
+			// canvas every frame.
+			if (exportActiveRef.current) {
+				previous = now;
+				raf = window.requestAnimationFrame(tick);
+				return;
+			}
 			const live = latestRef.current;
 			// Inactive (e.g. hidden behind another mobile pane — see App.tsx):
 			// skip resizing, rotation/pulse timing, marker projection, and the
@@ -1062,7 +1142,7 @@ export default function GlobeScene({
 			uniforms.uTime.value += delta;
 
 			if (live.autoRotate) {
-				targetPhi -= AUTO_ROTATE_SPEED * delta;
+				targetPhi -= AUTO_ROTATE_SPEED * live.autoRotateSpeed * delta;
 			}
 			targetTheta = clampTheta(targetTheta, live.lockedPolarAngle && !returningToDefault);
 
@@ -1079,8 +1159,318 @@ export default function GlobeScene({
 
 		raf = window.requestAnimationFrame(tick);
 
+		// Draws one marker's pill tag (background, green dot, label) onto the
+		// export composite canvas. This is a from-scratch Canvas 2D redraw of
+		// GlobeMarkerItem's CSS pill — the DOM tags are separate elements
+		// layered over the canvas, invisible to canvas capture, so exporting
+		// "the earth and the tags" means re-drawing the tags into the same
+		// canvas being recorded. `uiScale` maps the pill's normal CSS-pixel
+		// size up to the much larger export buffer so it reads the same
+		// proportionally, just crisper.
+		const drawMarkerTag = (
+			ctx: CanvasRenderingContext2D,
+			projected: ProjectedMarker,
+			uiScale: number
+		) => {
+			const label = projected.marker.label;
+			if (!label || projected.visibility < 0.05) return;
+
+			const fontSize = 12 * uiScale;
+			const paddingX = 10 * uiScale;
+			const paddingY = 8 * uiScale;
+			const dotSize = 8 * uiScale;
+			const gap = 10 * uiScale;
+			const gapAbovePin = 8 * uiScale;
+
+			ctx.font = `500 ${fontSize}px Inter, sans-serif`;
+			const textWidth = ctx.measureText(label).width;
+			const pillHeight = fontSize + paddingY * 2;
+			const pillWidth = dotSize + gap + textWidth + paddingX * 2;
+
+			const anchorX = projected.screenX * EXPORT_WIDTH;
+			const anchorY = projected.screenY * EXPORT_HEIGHT - gapAbovePin;
+			const pillX = anchorX - pillWidth / 2;
+			const pillY = anchorY - pillHeight;
+
+			ctx.globalAlpha = projected.visibility;
+			ctx.fillStyle = '#ffffff';
+			ctx.strokeStyle = '#e6eaed';
+			ctx.lineWidth = uiScale;
+			ctx.beginPath();
+			ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillHeight / 2);
+			ctx.fill();
+			ctx.stroke();
+
+			ctx.fillStyle = '#44d62c';
+			ctx.beginPath();
+			ctx.arc(pillX + paddingX + dotSize / 2, pillY + pillHeight / 2, dotSize / 2, 0, Math.PI * 2);
+			ctx.fill();
+
+			ctx.fillStyle = '#041c2c';
+			ctx.textBaseline = 'middle';
+			ctx.textAlign = 'left';
+			ctx.fillText(
+				label,
+				pillX + paddingX + dotSize + gap,
+				pillY + pillHeight / 2 + fontSize * 0.05
+			);
+			ctx.globalAlpha = 1;
+		};
+
+		const exportRotationVideo: GlobeSceneHandle['exportRotationVideo'] = async (options) => {
+			const onProgress = options?.onProgress;
+
+			if (exportActiveRef.current) {
+				throw new Error('A globe video export is already in progress.');
+			}
+			if (
+				typeof targetCanvas.captureStream !== 'function' ||
+				typeof MediaRecorder === 'undefined'
+			) {
+				throw new Error('Video export is not supported in this browser.');
+			}
+			const mimeType = EXPORT_MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
+			if (!mimeType) {
+				throw new Error('No supported video recording format is available in this browser.');
+			}
+
+			// The dropped-frame-at-the-start problem turned out not to be a
+			// WebGL/GPU warm-up issue at all — the rotation warm-up lap below
+			// already fully exercises that and made no difference. It's
+			// MediaRecorder's own encoder session that has a one-time
+			// startup cost the first time a page starts recording, separate
+			// from anything canvas-side. This runs a tiny, fully disposable
+			// recording (16×16px, three frames) just to eat that cost up
+			// front, on a throwaway recorder/canvas that never gets read —
+			// so the real recorder created later starts against an
+			// already-warm encoder instead of paying for that startup
+			// during the delivered clip's own first frames.
+			const primeCanvas = document.createElement('canvas');
+			primeCanvas.width = 16;
+			primeCanvas.height = 16;
+			const primeCtx = primeCanvas.getContext('2d');
+			if (primeCtx) {
+				const primeStream = primeCanvas.captureStream(0);
+				const [primeTrack] = primeStream.getVideoTracks() as CanvasCaptureMediaStreamTrack[];
+				const primeRecorder = new MediaRecorder(primeStream, { mimeType });
+				const primeStopped = new Promise<void>((resolve) => {
+					primeRecorder.onstop = () => resolve();
+				});
+				primeRecorder.start();
+				for (let i = 0; i < 3; i++) {
+					primeCtx.fillStyle = i % 2 === 0 ? '#000000' : '#ffffff';
+					primeCtx.fillRect(0, 0, 16, 16);
+					primeTrack.requestFrame();
+					await new Promise((resolve) => window.requestAnimationFrame(resolve));
+				}
+				primeRecorder.stop();
+				await primeStopped;
+			}
+
+			const compositeCanvas = document.createElement('canvas');
+			compositeCanvas.width = EXPORT_WIDTH;
+			compositeCanvas.height = EXPORT_HEIGHT;
+			const ctx = compositeCanvas.getContext('2d');
+			if (!ctx) {
+				throw new Error('Could not create a canvas context for the export.');
+			}
+
+			// Freezes the live loop and swaps the canvas over to the export's
+			// fixed resolution — its CSS box (style.width/height) is left
+			// alone, so nothing shifts in the layout, it just briefly renders
+			// at a much higher internal resolution than it's displayed at.
+			//
+			// renderer.render() sets the GL viewport to `width * dpr` (see
+			// OGL's Renderer.render/setSize) — the live loop passes it CSS
+			// pixels and lets dpr scale that up to the canvas's actual buffer
+			// size. EXPORT_WIDTH/EXPORT_HEIGHT are already the exact target
+			// buffer size, so dpr has to drop to 1 here, or the viewport ends
+			// up dpr× too large and WebGL only draws the corner of it that
+			// fits in the canvas — a zoomed-in, cropped globe with markers
+			// (projected independently, via width/height below) misaligned
+			// against it.
+			exportActiveRef.current = true;
+			const displayWidth = Math.max(1, targetCanvas.clientWidth);
+			const uiScale = EXPORT_WIDTH / displayWidth;
+			const originalDpr = renderer.dpr;
+
+			renderer.dpr = 1;
+			targetCanvas.width = EXPORT_WIDTH;
+			targetCanvas.height = EXPORT_HEIGHT;
+			renderer.width = EXPORT_WIDTH;
+			renderer.height = EXPORT_HEIGHT;
+			renderer.state.viewport = { x: 0, y: 0, width: null, height: null };
+			width = EXPORT_WIDTH;
+			height = EXPORT_HEIGHT;
+			uniforms.uResolution.value.set(EXPORT_WIDTH, EXPORT_HEIGHT);
+
+			await document.fonts?.ready;
+
+			const startPhi = phi;
+			const startTheta = theta;
+			let finalPhi = startPhi;
+			const exportAngularSpeed = (2 * PI) / EXPORT_DURATION_SECONDS;
+			// Two full laps back-to-back, same continuous rotation math
+			// throughout (no reset/seam between them): the first
+			// (0..EXPORT_DURATION_SECONDS) is an unrecorded warm-up lap that
+			// settles the GL viewport resize, shader/driver warm-up, and
+			// browser compositor onto the new 4K canvas; only the second
+			// (EXPORT_DURATION_SECONDS..totalSeconds) actually gets recorded,
+			// so that settling-in cost doesn't show up as jank/dropped
+			// frames in the delivered clip.
+			const totalSeconds = EXPORT_DURATION_SECONDS * 2 + RECORDING_RAMP_IN_SECONDS;
+			// The globe holds still (frozen at the exact rotation it's at
+			// when the recording lap begins) for this long once recording
+			// actually starts, before it starts turning. A brand-new
+			// MediaRecorder still tends to visibly stutter/drop its first
+			// handful of frames even once its encoder session and the GPU
+			// pipeline are both already warm (confirmed — neither the
+			// render warm-up lap above nor priming a throwaway recording
+			// beforehand fixed it on its own). Freezing the content for this
+			// window means whatever gets dropped during it is a duplicate of
+			// the same static frame, not lost rotation — so it costs nothing
+			// visually, unlike stutter during actual motion.
+			const recordingBoundaryPhi = startPhi - exportAngularSpeed * EXPORT_DURATION_SECONDS;
+
+			// Renders + composites one frame (WebGL globe, painted over a
+			// white fill since the canvas's own transparent clear color has
+			// no meaning in a video, plus the hand-drawn marker tags) at the
+			// given rotation, leaving the result sitting on compositeCanvas.
+			const renderFrame = (currentPhi: number) => {
+				uniforms.uRotation.value.set(currentPhi, startTheta);
+				syncMarkers(currentPhi, startTheta, currentScale);
+				renderer.render({ scene: globeScene, camera, clear: true });
+
+				ctx.fillStyle = '#ffffff';
+				ctx.fillRect(0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
+				ctx.drawImage(targetCanvas, 0, 0, EXPORT_WIDTH, EXPORT_HEIGHT);
+				for (const projected of projectedMarkersRef.current) {
+					drawMarkerTag(ctx, projected, uiScale);
+				}
+			};
+
+			// Renders the very first frame up front, so there's real content
+			// on the canvas from the first tick of the warm-up lap rather
+			// than whatever was left over from before the resize.
+			renderFrame(startPhi);
+
+			const chunks: Blob[] = [];
+			let recorder: MediaRecorder | null = null;
+			let track: CanvasCaptureMediaStreamTrack | null = null;
+			let stopped: Promise<void> | null = null;
+
+			try {
+				await new Promise<void>((resolve) => {
+					const startTime = performance.now();
+					const step = (now: number) => {
+						const elapsedSeconds = (now - startTime) / 1000;
+						const recordingElapsed = elapsedSeconds - EXPORT_DURATION_SECONDS;
+
+						let currentPhi: number;
+						if (elapsedSeconds < EXPORT_DURATION_SECONDS) {
+							currentPhi = startPhi - exportAngularSpeed * elapsedSeconds;
+						} else if (recordingElapsed < RECORDING_RAMP_IN_SECONDS) {
+							currentPhi = recordingBoundaryPhi;
+						} else {
+							currentPhi =
+								recordingBoundaryPhi -
+								exportAngularSpeed * (recordingElapsed - RECORDING_RAMP_IN_SECONDS);
+						}
+						finalPhi = currentPhi;
+						renderFrame(currentPhi);
+
+						if (elapsedSeconds < EXPORT_DURATION_SECONDS) {
+							onProgress?.({
+								phase: 'warmup',
+								fraction: Math.min(1, elapsedSeconds / EXPORT_DURATION_SECONDS)
+							});
+						} else {
+							if (!recorder) {
+								// Deliberately created and started right here, at
+								// the exact moment recording is meant to begin —
+								// not earlier. MediaRecorder holds/repeats the
+								// last frame it has to fill any gap between
+								// `.start()` and the first real frame, so
+								// starting it ahead of the warm-up lap (tried
+								// previously, to let its encoder pipeline spin up
+								// early) instead produced a frozen hold of the
+								// warm-up's last frame for that whole gap —
+								// doubling the clip's length with a static first
+								// half. Manual-frame mode (captureStream(0)) is
+								// what makes this safe to start this late:
+								// nothing is captured until requestFrame() is
+								// explicitly called below, so no frames are lost
+								// waiting for it.
+								const stream = compositeCanvas.captureStream(0);
+								[track] = stream.getVideoTracks() as CanvasCaptureMediaStreamTrack[];
+								recorder = new MediaRecorder(stream, {
+									mimeType,
+									videoBitsPerSecond: EXPORT_VIDEO_BITS_PER_SECOND
+								});
+								recorder.ondataavailable = (event) => {
+									if (event.data.size > 0) chunks.push(event.data);
+								};
+								stopped = new Promise<void>((resolveStop) => {
+									recorder!.onstop = () => resolveStop();
+								});
+								recorder.start();
+							}
+							track!.requestFrame();
+							onProgress?.({
+								phase: 'recording',
+								fraction: Math.min(
+									1,
+									recordingElapsed / (RECORDING_RAMP_IN_SECONDS + EXPORT_DURATION_SECONDS)
+								)
+							});
+						}
+
+						if (elapsedSeconds >= totalSeconds) {
+							resolve();
+							return;
+						}
+						window.requestAnimationFrame(step);
+					};
+					window.requestAnimationFrame(step);
+				});
+
+				if (recorder && stopped) {
+					(recorder as MediaRecorder).stop();
+					await stopped;
+				}
+			} finally {
+				exportActiveRef.current = false;
+				renderer.dpr = originalDpr;
+				// Resumes the live view from wherever the export's sweep ended
+				// instead of snapping back — phi/theta and targetPhi/targetTheta
+				// otherwise still hold their pre-export values, which the live
+				// loop's smoothing would otherwise ease back toward on the next
+				// frame the moment it resumes. The live tick() loop resizes the
+				// canvas back to its normal CSS-driven buffer size on its very
+				// next frame, since targetCanvas.width/height no longer match.
+				phi = finalPhi;
+				theta = startTheta;
+				targetPhi = phi;
+				targetTheta = theta;
+			}
+
+			const blob = new Blob(chunks, { type: mimeType });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = 'globe-rotation-4k-60fps.webm';
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+
+			return blob;
+		};
+		exportRotationVideoRef.current = exportRotationVideo;
+
 		return () => {
 			disposed = true;
+			exportRotationVideoRef.current = null;
 			focusAnimation?.stop();
 			focusAnimation = null;
 			window.cancelAnimationFrame(raf);
@@ -1130,4 +1520,8 @@ export default function GlobeScene({
 			</div>
 		</>
 	);
-}
+});
+
+GlobeScene.displayName = 'GlobeScene';
+
+export default GlobeScene;

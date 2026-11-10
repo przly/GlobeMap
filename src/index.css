@@ -67,6 +67,22 @@
 	--color-accent-secondary: var(--accent-secondary);
 	--color-border: var(--border);
 
+	/* Gray scale ported from the Specto marketing site's design tokens
+	   (src/styles/theme.css) — used by ExportPage's inputs to match that
+	   repo's Input component styling exactly. */
+	--color-gray-50: oklch(0.9719 0.0025 228.78);
+	--color-gray-100: oklch(0.9349 0.0059 239.82);
+	--color-gray-200: oklch(0.8575 0.0096 242.86);
+	--color-gray-300: oklch(0.7745 0.0142 241.01);
+	--color-gray-400: oklch(0.6897 0.0172 239.23);
+	--color-gray-500: oklch(0.6145 0.0169 241.93);
+	--color-gray-600: oklch(0.5212 0.0215 243.26);
+	--color-gray-700: oklch(0.4267 0.0275 242.47);
+	--color-gray-800: oklch(0.3304 0.0391 242.21);
+	--color-gray-900: oklch(0.2168 0.0436 240.97);
+	--color-gray-950: oklch(0.1554 0.0269 234.59);
+	--color-focus: oklch(0.6746 0.1414 261.34);
+
 	--radius-xs: calc(var(--radius-base) * 1);
 	--radius-sm: calc(var(--radius-base) * 2);
 	--radius-md: calc(var(--radius-base) * 3);
